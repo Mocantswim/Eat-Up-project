@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Header from '../components/Header';
 import SportIcon from '../components/SportIcon';
-import { BUILTIN_SPORTS, getSportFactor, type SportKind } from '../constants/sports';
+import { BUILTIN_SPORTS, getSportAddBodyWeight, getSportFactor, type SportKind } from '../constants/sports';
 import {
   addExercise,
   calcExerciseCalories,
@@ -32,6 +32,7 @@ interface SportOption {
   kind: SportKind;
   factor?: number;
   perUnitKcal?: number; // 自定义次数型：每 1 个消耗 kcal
+  addBodyWeight?: boolean; // 重量型：含自重（深蹲）
 }
 
 /** 添加/编辑运动（策划书 §2.1.3，支持 时长/次数/重量 三种模式） */
@@ -44,6 +45,8 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
   const [duration, setDuration] = useState('');
   const [reps, setReps] = useState('');
   const [loadKg, setLoadKg] = useState('');
+  const [note, setNote] = useState('');
+  const [noteHeight, setNoteHeight] = useState(42);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [keyword, setKeyword] = useState('');
@@ -59,6 +62,7 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
         custom: false,
         kind: s.kind,
         factor: s.kind === 'reps' ? s.repFactor : s.kind === 'weight' ? s.weightFactor : undefined,
+        addBodyWeight: s.addBodyWeight,
       })),
       ...customs.map((c) => ({
         name: c.name,
@@ -94,10 +98,12 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
           kind: log.kind,
           factor,
           perUnitKcal: log.perUnitKcal ?? undefined,
+          addBodyWeight: getSportAddBodyWeight(log.sportType),
         });
         setDuration(log.kind === 'duration' && log.durationMin > 0 ? String(log.durationMin) : '');
         setReps(log.reps != null ? String(log.reps) : '');
         setLoadKg(log.loadKg != null ? String(log.loadKg) : '');
+        setNote(log.note ?? '');
       }
     })();
   }, [logId]);
@@ -124,7 +130,8 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
       if (isNaN(w) || w <= 0 || isNaN(r) || r <= 0) return 0;
       return calcExerciseCalories({
         date, sportType: selected.name, kind: 'weight', loadKg: w, reps: r,
-        met: selected.met, factor: selected.factor ?? getSportFactor(selected.name), weightKg: profile.weight,
+        met: selected.met, factor: selected.factor ?? getSportFactor(selected.name),
+        addBodyWeight: selected.addBodyWeight, weightKg: profile.weight,
       });
     }
     const d = parseFloat(duration);
@@ -151,6 +158,7 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
       sportType: selected.name,
       met: selected.met,
       weightKg: profile.weight,
+      note: note.trim() || null,
     };
     let input;
     if (selected.kind === 'reps') {
@@ -183,6 +191,7 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
         loadKg: w,
         reps: r,
         factor: selected.factor ?? getSportFactor(selected.name),
+        addBodyWeight: selected.addBodyWeight,
       };
     } else {
       const d = parseFloat(duration);
@@ -309,7 +318,7 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
                 value={loadKg}
                 onChangeText={(t) => setLoadKg(t.replace(/[^0-9.]/g, ''))}
                 keyboardType="numeric"
-                placeholder="如 50"
+                placeholder={selected.addBodyWeight ? '如 20（配重）' : '如 50'}
                 placeholderTextColor={colors.textMuted}
               />
               <Text style={styles.durationUnit}>kg</Text>
@@ -326,9 +335,31 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
               />
               <Text style={styles.durationUnit}>次</Text>
             </View>
-            <Text style={styles.hintText}>按重量 × 次数估算</Text>
+            <Text style={styles.hintText}>
+              {selected.addBodyWeight
+                ? `按（体重 ${profile?.weight ?? '?'}kg + 配重）× 次数估算`
+                : '按重量 × 次数估算'}
+            </Text>
           </>
         )}
+
+        {/* 运动笔记（选填） */}
+        <Text style={styles.label}>运动笔记（选填）</Text>
+        <View style={styles.noteWrap}>
+          <TextInput
+            style={[styles.noteInput, { height: noteHeight }]}
+            value={note}
+            onChangeText={(t) => setNote(t.slice(0, 100))}
+            onContentSizeChange={(e) => {
+              const h = e.nativeEvent.contentSize.height;
+              setNoteHeight(Math.min(Math.max(h, 42), 84)); // 最多 3 行
+            }}
+            multiline
+            placeholder="记录一下今天的感受…"
+            placeholderTextColor={colors.textMuted}
+          />
+          <Text style={styles.noteCount}>{note.length}/100</Text>
+        </View>
 
         {profile?.weight != null && (
           <View style={styles.previewCard}>
@@ -409,6 +440,10 @@ function SportPicker({
       }
     } else if (isNaN(mv) || mv <= 0) {
       Alert.alert('提示', '请输入有效 MET 值');
+      return;
+    }
+    if (BUILTIN_SPORTS.some((s) => s.name === name)) {
+      Alert.alert('提示', '该名称与内置运动重复，无需新建');
       return;
     }
     if (await customSportNameExists(name)) {
@@ -524,7 +559,7 @@ function SportPicker({
               />
               <FlatList
                 data={options}
-                keyExtractor={(o) => o.name}
+                keyExtractor={(o) => (o.custom ? `c-${o.name}` : `b-${o.name}`)}
                 keyboardShouldPersistTaps="handled"
                 style={styles.pickerList}
                 ListEmptyComponent={
@@ -626,6 +661,27 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     color: colors.textMuted,
     marginTop: spacing.sm,
+  },
+  noteWrap: {
+    position: 'relative',
+  },
+  noteInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    fontSize: fontSize.sm,
+    color: colors.text,
+    backgroundColor: colors.card,
+    textAlignVertical: 'top',
+  },
+  noteCount: {
+    position: 'absolute',
+    right: spacing.md,
+    bottom: spacing.sm,
+    fontSize: fontSize.xs,
+    color: colors.textMuted,
   },
   quickRow: {
     flexDirection: 'row',

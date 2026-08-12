@@ -57,6 +57,7 @@ export async function initDatabase(): Promise<void> {
   await migrateExerciseLogFields(database);
   await migrateCustomSportsKind(database);
   await migrateExerciseLogKind(database);
+  await migrateExerciseLogNote(database);
 }
 
 /** V2 迁移：user_profile 增加每周目标列（幂等） */
@@ -112,5 +113,15 @@ async function migrateExerciseLogKind(database: SQLite.SQLiteDatabase): Promise<
   }
   if (!cols.some((c) => c.name === 'per_unit_kcal')) {
     await database.execAsync('ALTER TABLE exercise_log ADD COLUMN per_unit_kcal REAL');
+  }
+}
+
+/** V2 迁移：exercise_log 增加备注列（运动笔记） */
+async function migrateExerciseLogNote(database: SQLite.SQLiteDatabase): Promise<void> {
+  const cols = await database.getAllAsync<{ name: string }>(
+    'PRAGMA table_info(exercise_log)'
+  );
+  if (!cols.some((c) => c.name === 'note')) {
+    await database.execAsync('ALTER TABLE exercise_log ADD COLUMN note TEXT');
   }
 }

@@ -18,7 +18,7 @@ import {
   getAllCustomSports,
   updateCustomSport,
 } from '../db/customSportDao';
-import type { SportKind } from '../constants/sports';
+import { BUILTIN_SPORTS, type SportKind } from '../constants/sports';
 import type { ProfileStackParamList } from '../navigation/types';
 import { colors, contentPadding, fontFamily, fontSize, radius, spacing } from '../theme/theme';
 
@@ -68,6 +68,10 @@ export default function CustomSportFormScreen({ navigation, route }: Props) {
       }
     } else if (!met.trim() || isNaN(mv) || mv <= 0 || mv > 16) {
       Alert.alert('提示', '请输入有效 MET 值（1.0–16.0）');
+      return;
+    }
+    if (BUILTIN_SPORTS.some((s) => s.name === trimmed)) {
+      Alert.alert('提示', '该名称与内置运动重复，无需新建');
       return;
     }
     if (await customSportNameExists(trimmed, sportId)) {

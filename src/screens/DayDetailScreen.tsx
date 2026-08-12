@@ -17,6 +17,7 @@ import EmptyState from '../components/EmptyState';
 import SportIcon from '../components/SportIcon';
 import FoodCard from '../components/FoodCard';
 import Confetti from '../components/Confetti';
+import WorkoutTimer from '../components/WorkoutTimer';
 import {
   deleteExercise,
   getDailyTotal,
@@ -41,6 +42,7 @@ export default function DayDetailScreen({ navigation, route }: Props) {
   const [total, setTotal] = useState(0);
   const [weightInput, setWeightInput] = useState('');
   const [confetti, setConfetti] = useState(false);
+  const [expandedNoteId, setExpandedNoteId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     const [list, t, w, trigger] = await Promise.all([
@@ -119,36 +121,56 @@ export default function DayDetailScreen({ navigation, route }: Props) {
           </View>
         </View>
 
+        {/* 内置训练计时器 */}
+        <WorkoutTimer />
+
         {/* 运动列表 */}
         <Text style={styles.sectionTitle}>运动记录</Text>
         {logs.length === 0 ? (
           <EmptyState emoji="🏃" text="这一天还没有运动记录，点击右下角 + 添加" />
         ) : (
           logs.map((log) => (
-            <View key={log.id} style={styles.logCard}>
-              <SportIcon emoji={builtinEmojiByName(log.sportType)} />
-              <View style={styles.logInfo}>
-                <Text style={styles.logName}>{log.sportType}</Text>
-                <Text style={styles.logMeta}>
-                  {log.kind === 'reps'
-                    ? `${log.reps} 次 · ${log.weightUsed}kg`
-                    : log.kind === 'weight'
-                    ? `${log.loadKg}kg × ${log.reps} 次`
-                    : `${log.durationMin} 分钟 · ${log.weightUsed}kg`}
-                </Text>
+            <View key={log.id} style={styles.logWrap}>
+              <View style={styles.logCard}>
+                <SportIcon emoji={builtinEmojiByName(log.sportType)} />
+                <View style={styles.logInfo}>
+                  <Text style={styles.logName}>{log.sportType}</Text>
+                  <Text style={styles.logMeta}>
+                    {log.kind === 'reps'
+                      ? `${log.reps} 次 · ${log.weightUsed}kg`
+                      : log.kind === 'weight'
+                      ? `${log.loadKg}kg × ${log.reps} 次`
+                      : `${log.durationMin} 分钟 · ${log.weightUsed}kg`}
+                  </Text>
+                </View>
+                <Text style={styles.logCalories}>{log.calories.toFixed(1)} kcal</Text>
+                <View style={styles.logActions}>
+                  <Pressable
+                    hitSlop={8}
+                    onPress={() => navigation.navigate('AddEditExercise', { date, logId: log.id })}
+                  >
+                    <Ionicons name="create-outline" size={20} color={colors.textSecondary} />
+                  </Pressable>
+                  <Pressable hitSlop={8} onPress={() => handleDelete(log.id)}>
+                    <Ionicons name="trash-outline" size={20} color={colors.danger} />
+                  </Pressable>
+                  {log.note ? (
+                    <Pressable
+                      hitSlop={8}
+                      onPress={() =>
+                        setExpandedNoteId(expandedNoteId === log.id ? null : log.id)
+                      }
+                    >
+                      <Ionicons name="document-text-outline" size={16} color={colors.textMuted} />
+                    </Pressable>
+                  ) : null}
+                </View>
               </View>
-              <Text style={styles.logCalories}>{log.calories.toFixed(1)} kcal</Text>
-              <View style={styles.logActions}>
-                <Pressable
-                  hitSlop={8}
-                  onPress={() => navigation.navigate('AddEditExercise', { date, logId: log.id })}
-                >
-                  <Ionicons name="create-outline" size={20} color={colors.textSecondary} />
-                </Pressable>
-                <Pressable hitSlop={8} onPress={() => handleDelete(log.id)}>
-                  <Ionicons name="trash-outline" size={20} color={colors.danger} />
-                </Pressable>
-              </View>
+              {expandedNoteId === log.id && log.note ? (
+                <View style={styles.noteExpand}>
+                  <Text style={styles.noteText}>{log.note}</Text>
+                </View>
+              ) : null}
             </View>
           ))
         )}
@@ -248,7 +270,27 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.lg,
+  },
+  logWrap: {
     marginBottom: spacing.md,
+  },
+  noteExpand: {
+    backgroundColor: '#F5F8FC',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderTopWidth: 0,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    marginTop: -spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  noteText: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    lineHeight: 20,
+    color: colors.textSecondary,
   },
   logInfo: {
     flex: 1,

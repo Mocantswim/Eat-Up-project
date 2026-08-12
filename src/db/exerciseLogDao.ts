@@ -13,6 +13,7 @@ export interface ExerciseLog {
   metValue: number;
   weightUsed: number;
   perUnitKcal: number | null; // 次数型自定义：每 1 个消耗 kcal
+  note: string | null; // 运动笔记（选填）
   calories: number;
   createdAt: string;
 }
@@ -28,6 +29,7 @@ interface ExerciseLogRow {
   met_value: number;
   weight_used: number;
   per_unit_kcal: number | null;
+  note: string | null;
   calories: number;
   created_at: string;
 }
@@ -44,6 +46,7 @@ function mapRow(r: ExerciseLogRow): ExerciseLog {
     metValue: r.met_value,
     weightUsed: r.weight_used,
     perUnitKcal: r.per_unit_kcal ?? null,
+    note: r.note ?? null,
     calories: r.calories,
     createdAt: r.created_at,
   };
@@ -60,6 +63,8 @@ export interface ExerciseInput {
   met: number;
   factor?: number; // 次数/重量型的换算系数
   perUnitKcal?: number | null; // 次数型自定义：每 1 个消耗 kcal
+  addBodyWeight?: boolean; // 重量型：是否计入体重（如深蹲含自重）
+  note?: string | null; // 运动笔记（选填，≤100字）
   weightKg: number;
 }
 
@@ -71,7 +76,11 @@ export function calcExerciseCalories(input: ExerciseInput): number {
     return calcRepsCalories(input.reps ?? 0, input.weightKg, input.factor ?? 0);
   }
   if (input.kind === 'weight') {
-    return calcWeightCalories(input.loadKg ?? 0, input.reps ?? 0, input.factor ?? 0);
+    // 深蹲等含自重：总重量 = 配重 + 体重
+    const base = input.addBodyWeight
+      ? (input.loadKg ?? 0) + input.weightKg
+      : (input.loadKg ?? 0);
+    return calcWeightCalories(base, input.reps ?? 0, input.factor ?? 0);
   }
   return calcCalories(input.met, input.weightKg, input.durationMin ?? 0);
 }
@@ -82,8 +91,8 @@ export async function addExercise(params: ExerciseInput): Promise<number> {
   const durationMin = params.kind === 'duration' ? params.durationMin ?? 0 : 0;
   const db = getDb();
   const result = await db.runAsync(
-    `INSERT INTO exercise_log (date, sport_type, kind, duration_min, rep_count, load_weight, met_value, weight_used, per_unit_kcal, calories, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO exercise_log (date, sport_type, kind, duration_min, rep_count, load_weight, met_value, weight_used, per_unit_kcal, note, calories, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     params.date,
     params.sportType,
     params.kind,
@@ -93,6 +102,7 @@ export async function addExercise(params: ExerciseInput): Promise<number> {
     params.met,
     params.weightKg,
     params.perUnitKcal ?? null,
+    params.note ?? null,
     calories,
     new Date().toISOString()
   );
@@ -105,7 +115,7 @@ export async function updateExercise(id: number, params: ExerciseInput): Promise
   const durationMin = params.kind === 'duration' ? params.durationMin ?? 0 : 0;
   const db = getDb();
   await db.runAsync(
-    `UPDATE exercise_log SET sport_type=?, kind=?, duration_min=?, rep_count=?, load_weight=?, met_value=?, weight_used=?, per_unit_kcal=?, calories=? WHERE id=?`,
+    `UPDATE exercise_log SET sport_type=?, kind=?, duration_min=?, rep_count=?, load_weight=?, met_value=?, weight_used=?, per_unit_kcal=?, note=?, calories=? WHERE id=?`,
     params.sportType,
     params.kind,
     durationMin,
@@ -114,6 +124,7 @@ export async function updateExercise(id: number, params: ExerciseInput): Promise
     params.met,
     params.weightKg,
     params.perUnitKcal ?? null,
+    params.note ?? null,
     calories,
     id
   );
