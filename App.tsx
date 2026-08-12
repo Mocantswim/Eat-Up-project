@@ -6,12 +6,14 @@ import { StatusBar } from 'expo-status-bar';
 import { initDatabase } from './src/db/database';
 import { hasProfile } from './src/db/userProfileDao';
 import RootNavigator from './src/navigation/RootNavigator';
+import CoverScreen from './src/components/CoverScreen';
 import { onDataCleared } from './src/utils/events';
 import { colors } from './src/theme/theme';
 
 export default function App() {
   const [ready, setReady] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [showCover, setShowCover] = useState(true);
 
   useEffect(() => {
     // 数据被清除后回到引导页
@@ -35,6 +37,8 @@ export default function App() {
         <View style={styles.loading}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
+      ) : showCover ? (
+        <CoverScreen onDone={() => setShowCover(false)} />
       ) : (
         <SafeAreaProvider>
           <StatusBar style="dark" />
