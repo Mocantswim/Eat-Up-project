@@ -18,6 +18,7 @@ import {
   getAllCustomSports,
   updateCustomSport,
 } from '../db/customSportDao';
+import type { SportKind } from '../constants/sports';
 import type { ProfileStackParamList } from '../navigation/types';
 import { colors, contentPadding, fontFamily, fontSize, radius, spacing } from '../theme/theme';
 
@@ -25,13 +26,15 @@ type Props = NativeStackScreenProps<ProfileStackParamList, 'CustomSportForm'>;
 
 const MET_REFERENCE = '参考 MET：走路 3.0 · 跑步 8.0 · 快走 5.0 · 游泳 6.0';
 
-/** 新增/编辑自定义运动（策划书 §2.1.2） */
+/** 新增/编辑自定义运动（策划书 §2.1.2，支持按时长/按次数） */
 export default function CustomSportFormScreen({ navigation, route }: Props) {
   const { sportId } = route.params;
   const isEdit = sportId != null;
 
   const [name, setName] = useState('');
+  const [kind, setKind] = useState<SportKind>('duration');
   const [met, setMet] = useState('');
+  const [perUnitKcal, setPerUnitKcal] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -41,7 +44,9 @@ export default function CustomSportFormScreen({ navigation, route }: Props) {
       const sport = list.find((s) => s.id === sportId);
       if (sport) {
         setName(sport.name);
+        setKind(sport.kind ?? 'duration');
         setMet(String(sport.metValue));
+        setPerUnitKcal(sport.perUnitKcal != null ? String(sport.perUnitKcal) : '');
       }
     })();
   }, [isEdit, sportId]);
@@ -53,8 +58,15 @@ export default function CustomSportFormScreen({ navigation, route }: Props) {
       Alert.alert('提示', '请输入运动名称');
       return;
     }
+    const isReps = kind === 'reps';
     const mv = parseFloat(met);
-    if (!met.trim() || isNaN(mv) || mv <= 0 || mv > 16) {
+    const pk = parseFloat(perUnitKcal);
+    if (isReps) {
+      if (!perUnitKcal.trim() || isNaN(pk) || pk <= 0 || pk > 100) {
+        Alert.alert('提示', '请输入每个消耗 kcal（0.1–100）');
+        return;
+      }
+    } else if (!met.trim() || isNaN(mv) || mv <= 0 || mv > 16) {
       Alert.alert('提示', '请输入有效 MET 值（1.0–16.0）');
       return;
     }
@@ -66,9 +78,9 @@ export default function CustomSportFormScreen({ navigation, route }: Props) {
     setSaving(true);
     try {
       if (isEdit && sportId != null) {
-        await updateCustomSport(sportId, trimmed, mv);
+        await updateCustomSport(sportId, trimmed, isReps ? 0 : mv, kind, isReps ? pk : null);
       } else {
-        await addCustomSport(trimmed, mv);
+        await addCustomSport(trimmed, isReps ? 0 : mv, kind, isReps ? pk : null);
       }
       navigation.goBack();
     } catch (e) {
@@ -96,16 +108,53 @@ export default function CustomSportFormScreen({ navigation, route }: Props) {
             maxLength={12}
           />
 
-          <Text style={styles.label}>MET 值 *</Text>
-          <TextInput
-            style={styles.input}
-            value={met}
-            onChangeText={(t) => setMet(t.replace(/[^0-9.]/g, ''))}
-            keyboardType="decimal-pad"
-            placeholder="如 5.0"
-            placeholderTextColor={colors.textMuted}
-          />
-          <Text style={styles.hint}>{MET_REFERENCE}</Text>
+          <Text style={styles.label}>计算方式 *</Text>
+          <View style={styles.kindRow}>
+            <Pressable
+              style={[styles.kindBtn, kind === 'duration' && styles.kindBtnActive]}
+              onPress={() => setKind('duration')}
+            >
+              <Text style={[styles.kindBtnText, kind === 'duration' && styles.kindBtnTextActive]}>
+                ⏱ 按时长
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.kindBtn, kind === 'reps' && styles.kindBtnActive]}
+              onPress={() => setKind('reps')}
+            >
+              <Text style={[styles.kindBtnText, kind === 'reps' && styles.kindBtnTextActive]}>
+                🔢 按次数
+              </Text>
+            </Pressable>
+          </View>
+
+          {kind === 'duration' ? (
+            <>
+              <Text style={styles.label}>MET 值 *</Text>
+              <TextInput
+                style={styles.input}
+                value={met}
+                onChangeText={(t) => setMet(t.replace(/[^0-9.]/g, ''))}
+                keyboardType="decimal-pad"
+                placeholder="如 5.0"
+                placeholderTextColor={colors.textMuted}
+              />
+              <Text style={styles.hint}>{MET_REFERENCE}</Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.label}>每 1 个消耗（kcal）*</Text>
+              <TextInput
+                style={styles.input}
+                value={perUnitKcal}
+                onChangeText={(t) => setPerUnitKcal(t.replace(/[^0-9.]/g, ''))}
+                keyboardType="decimal-pad"
+                placeholder="如 0.5"
+                placeholderTextColor={colors.textMuted}
+              />
+              <Text style={styles.hint}>记录时输入次数，消耗 = 次数 × 每单位 kcal</Text>
+            </>
+          )}
 
           <Pressable
             style={({ pressed }) => [styles.saveBtn, pressed && { opacity: 0.85 }]}
@@ -150,6 +199,32 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     color: colors.textMuted,
     marginTop: spacing.sm,
+  },
+  kindRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  kindBtn: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+  },
+  kindBtnActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryBg,
+  },
+  kindBtnText: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.md,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  kindBtnTextActive: {
+    color: colors.primary,
   },
   saveBtn: {
     marginTop: spacing.xxl,

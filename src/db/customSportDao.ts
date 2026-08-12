@@ -1,35 +1,53 @@
 import { getDb } from './database';
+import type { SportKind } from '../constants/sports';
 
 export interface CustomSport {
   id: number;
   name: string;
   metValue: number;
+  kind: SportKind;
+  perUnitKcal: number | null; // 次数型：每 1 个消耗 kcal
 }
 
 interface CustomSportRow {
   id: number;
   name: string;
   met_value: number;
+  kind: SportKind;
+  per_unit_kcal: number | null;
 }
 
 function mapRow(r: CustomSportRow): CustomSport {
-  return { id: r.id, name: r.name, metValue: r.met_value };
+  return {
+    id: r.id,
+    name: r.name,
+    metValue: r.met_value,
+    kind: r.kind ?? 'duration',
+    perUnitKcal: r.per_unit_kcal ?? null,
+  };
 }
 
 export async function getAllCustomSports(): Promise<CustomSport[]> {
   const db = getDb();
   const rows = await db.getAllAsync<CustomSportRow>(
-    'SELECT id, name, met_value FROM custom_sports ORDER BY name ASC'
+    'SELECT id, name, met_value, kind, per_unit_kcal FROM custom_sports ORDER BY name ASC'
   );
   return rows.map(mapRow);
 }
 
-export async function addCustomSport(name: string, metValue: number): Promise<number> {
+export async function addCustomSport(
+  name: string,
+  metValue: number,
+  kind: SportKind = 'duration',
+  perUnitKcal?: number | null
+): Promise<number> {
   const db = getDb();
   const result = await db.runAsync(
-    'INSERT INTO custom_sports (name, met_value) VALUES (?, ?)',
+    'INSERT INTO custom_sports (name, met_value, kind, per_unit_kcal) VALUES (?, ?, ?, ?)',
     name,
-    metValue
+    metValue,
+    kind,
+    perUnitKcal ?? null
   );
   return result.lastInsertRowId;
 }
@@ -37,13 +55,17 @@ export async function addCustomSport(name: string, metValue: number): Promise<nu
 export async function updateCustomSport(
   id: number,
   name: string,
-  metValue: number
+  metValue: number,
+  kind: SportKind = 'duration',
+  perUnitKcal?: number | null
 ): Promise<void> {
   const db = getDb();
   await db.runAsync(
-    'UPDATE custom_sports SET name = ?, met_value = ? WHERE id = ?',
+    'UPDATE custom_sports SET name = ?, met_value = ?, kind = ?, per_unit_kcal = ? WHERE id = ?',
     name,
     metValue,
+    kind,
+    perUnitKcal ?? null,
     id
   );
 }

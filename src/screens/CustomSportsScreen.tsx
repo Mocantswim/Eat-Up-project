@@ -59,7 +59,11 @@ export default function CustomSportsScreen({ navigation }: Props) {
               <SportIcon emoji="🏅" size={40} />
               <View style={styles.customInfo}>
                 <Text style={styles.customName}>{sport.name}</Text>
-                <Text style={styles.customMeta}>MET {sport.metValue}</Text>
+                <Text style={styles.customMeta}>
+                  {sport.kind === 'reps'
+                    ? `按次数 · ${sport.perUnitKcal} kcal/个`
+                    : `按时长 · MET ${sport.metValue}`}
+                </Text>
               </View>
               <Pressable
                 hitSlop={8}
