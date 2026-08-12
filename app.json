@@ -35,7 +35,8 @@
     ],
     "updates": {
       "enabled": true,
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/a78c37c5-3788-49b4-b191-30a7da8e93be"
     },
     "runtimeVersion": {
       "policy": "appVersion"
@@ -45,6 +46,7 @@
         "projectId": "a78c37c5-3788-49b4-b191-30a7da8e93be"
       }
     },
-    "owner": "momoc"
+    "owner": "momoc",
+    "ios": {}
   }
 }
