@@ -3,14 +3,12 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
-import { useAudioPlayer } from 'expo-audio';
 import { colors, fontFamily, fontSize, radius, spacing } from '../theme/theme';
 
 type Phase = 'training' | 'rest';
 
 /** 内置训练计时器：自动循环 训练→休息→训练…，时钟圆环蓝色随时间消退 */
 export default function WorkoutTimer() {
-  const player = useAudioPlayer(require('../../assets/beep.wav'));
   const [status, setStatus] = useState<'idle' | 'running' | 'paused' | 'finished'>('idle');
   const [phase, setPhase] = useState<Phase>('training');
   const [group, setGroup] = useState(1);
@@ -22,14 +20,6 @@ export default function WorkoutTimer() {
   const [restSec, setRestSec] = useState('30');
   const [groups, setGroups] = useState('3');
 
-  const beep = () => {
-    try {
-      player.seekTo(0);
-      player.play();
-    } catch {
-      // 忽略
-    }
-  };
   const vibrate = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
   };
@@ -42,12 +32,10 @@ export default function WorkoutTimer() {
     setTotalSeconds(w);
     setStatus('running');
     vibrate();
-    beep();
   };
 
   const phaseEnd = () => {
     vibrate();
-    beep();
     if (phase === 'training') {
       if (group >= (parseInt(groups, 10) || 3)) {
         setStatus('finished');
