@@ -55,6 +55,8 @@ export async function initDatabase(): Promise<void> {
 
   await migrateUserProfileGoals(database);
   await migrateExerciseLogFields(database);
+  await migrateCustomSportsKind(database);
+  await migrateExerciseLogKind(database);
 }
 
 /** V2 迁移：user_profile 增加每周目标列（幂等） */
@@ -70,6 +72,21 @@ async function migrateUserProfileGoals(database: SQLite.SQLiteDatabase): Promise
   }
 }
 
+/** V2 迁移：custom_sports 增加计算模式与每单位热量列 */
+async function migrateCustomSportsKind(database: SQLite.SQLiteDatabase): Promise<void> {
+  const cols = await database.getAllAsync<{ name: string }>(
+    'PRAGMA table_info(custom_sports)'
+  );
+  if (!cols.some((c) => c.name === 'kind')) {
+    await database.execAsync(
+      "ALTER TABLE custom_sports ADD COLUMN kind TEXT DEFAULT 'duration'"
+    );
+  }
+  if (!cols.some((c) => c.name === 'per_unit_kcal')) {
+    await database.execAsync('ALTER TABLE custom_sports ADD COLUMN per_unit_kcal REAL');
+  }
+}
+
 /** V2 迁移：exercise_log 增加次数/重量列（次数型、重量型运动，幂等） */
 async function migrateExerciseLogFields(database: SQLite.SQLiteDatabase): Promise<void> {
   const cols = await database.getAllAsync<{ name: string }>(
@@ -80,5 +97,20 @@ async function migrateExerciseLogFields(database: SQLite.SQLiteDatabase): Promis
   }
   if (!cols.some((c) => c.name === 'load_weight')) {
     await database.execAsync('ALTER TABLE exercise_log ADD COLUMN load_weight REAL');
+  }
+}
+
+/** V2 迁移：exercise_log 增加模式与每单位热量列（历史数据快照） */
+async function migrateExerciseLogKind(database: SQLite.SQLiteDatabase): Promise<void> {
+  const cols = await database.getAllAsync<{ name: string }>(
+    'PRAGMA table_info(exercise_log)'
+  );
+  if (!cols.some((c) => c.name === 'kind')) {
+    await database.execAsync(
+      "ALTER TABLE exercise_log ADD COLUMN kind TEXT DEFAULT 'duration'"
+    );
+  }
+  if (!cols.some((c) => c.name === 'per_unit_kcal')) {
+    await database.execAsync('ALTER TABLE exercise_log ADD COLUMN per_unit_kcal REAL');
   }
 }

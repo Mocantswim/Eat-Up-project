@@ -31,6 +31,7 @@ interface SportOption {
   custom: boolean;
   kind: SportKind;
   factor?: number;
+  perUnitKcal?: number; // 自定义次数型：每 1 个消耗 kcal
 }
 
 /** 添加/编辑运动（策划书 §2.1.3，支持 时长/次数/重量 三种模式） */
@@ -64,7 +65,8 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
         met: c.metValue,
         emoji: '🏅',
         custom: true,
-        kind: 'duration' as SportKind,
+        kind: c.kind ?? 'duration',
+        perUnitKcal: c.perUnitKcal ?? undefined,
       })),
     ]);
     setProfile(p);
@@ -91,6 +93,7 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
           custom: false,
           kind: log.kind,
           factor,
+          perUnitKcal: log.perUnitKcal ?? undefined,
         });
         setDuration(log.kind === 'duration' && log.durationMin > 0 ? String(log.durationMin) : '');
         setReps(log.reps != null ? String(log.reps) : '');
@@ -111,7 +114,8 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
       if (isNaN(r) || r <= 0) return 0;
       return calcExerciseCalories({
         date, sportType: selected.name, kind: 'reps', reps: r,
-        met: selected.met, factor: selected.factor ?? getSportFactor(selected.name), weightKg: profile.weight,
+        met: selected.met, factor: selected.factor ?? getSportFactor(selected.name),
+        perUnitKcal: selected.perUnitKcal, weightKg: profile.weight,
       });
     }
     if (selected.kind === 'weight') {
@@ -160,6 +164,7 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
         kind: 'reps' as SportKind,
         reps: r,
         factor: selected.factor ?? getSportFactor(selected.name),
+        perUnitKcal: selected.perUnitKcal,
       };
     } else if (selected.kind === 'weight') {
       const w = parseFloat(loadKg);
@@ -210,8 +215,8 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
 
   /** 从选择器内新增自定义运动后：选中它并刷新列表 */
   const handleSportCreated = useCallback(
-    async (name: string, met: number) => {
-      setSelected({ name, met, emoji: '🏅', custom: true, kind: 'duration' });
+    async (name: string, met: number, kind: SportKind = 'duration', perUnitKcal?: number) => {
+      setSelected({ name, met, emoji: '🏅', custom: true, kind, perUnitKcal });
       setPickerVisible(false);
       setKeyword('');
       await loadBase();
@@ -379,22 +384,30 @@ function SportPicker({
   onKeywordChange: (v: string) => void;
   onSelect: (o: SportOption) => void;
   onClose: () => void;
-  onCreate?: (name: string, met: number) => void;
+  onCreate?: (name: string, met: number, kind?: SportKind, perUnitKcal?: number) => void;
 }) {
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
+  const [newKind, setNewKind] = useState<SportKind>('duration');
   const [newMet, setNewMet] = useState('');
+  const [newPerUnit, setNewPerUnit] = useState('');
   const [creating, setCreating] = useState(false);
 
   const handleCreate = async () => {
     if (creating) return;
     const name = newName.trim();
     const mv = parseFloat(newMet);
+    const pu = parseFloat(newPerUnit);
     if (!name) {
       Alert.alert('提示', '请输入运动名称');
       return;
     }
-    if (isNaN(mv) || mv <= 0) {
+    if (newKind === 'reps') {
+      if (isNaN(pu) || pu <= 0 || pu > 100) {
+        Alert.alert('提示', '请输入每个消耗 kcal（0.1–100）');
+        return;
+      }
+    } else if (isNaN(mv) || mv <= 0) {
       Alert.alert('提示', '请输入有效 MET 值');
       return;
     }
@@ -404,11 +417,13 @@ function SportPicker({
     }
     setCreating(true);
     try {
-      await addCustomSport(name, mv);
-      onCreate?.(name, mv);
+      await addCustomSport(name, newKind === 'reps' ? 0 : mv, newKind, newKind === 'reps' ? pu : null);
+      onCreate?.(name, newKind === 'reps' ? 0 : mv, newKind, newKind === 'reps' ? pu : undefined);
       setShowCreate(false);
       setNewName('');
+      setNewKind('duration');
       setNewMet('');
+      setNewPerUnit('');
     } catch {
       Alert.alert('出错了', '保存失败，请重试');
     } finally {
@@ -437,16 +452,56 @@ function SportPicker({
                 placeholderTextColor={colors.textMuted}
                 maxLength={12}
               />
-              <Text style={styles.label}>MET 值</Text>
-              <TextInput
-                style={styles.searchInput}
-                value={newMet}
-                onChangeText={(t) => setNewMet(t.replace(/[^0-9.]/g, ''))}
-                keyboardType="decimal-pad"
-                placeholder="如 5.0"
-                placeholderTextColor={colors.textMuted}
-              />
-              <Text style={styles.hintText}>参考 MET：走路 3.0 · 跑步 8.0</Text>
+              <Text style={styles.label}>计算方式</Text>
+              <View style={styles.quickRow}>
+                <Pressable
+                  style={[styles.quickBtn, newKind === 'duration' && styles.quickBtnActive]}
+                  onPress={() => setNewKind('duration')}
+                >
+                  <Text
+                    style={[styles.quickBtnText, newKind === 'duration' && styles.quickBtnTextActive]}
+                  >
+                    ⏱ 按时长
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.quickBtn, newKind === 'reps' && styles.quickBtnActive]}
+                  onPress={() => setNewKind('reps')}
+                >
+                  <Text
+                    style={[styles.quickBtnText, newKind === 'reps' && styles.quickBtnTextActive]}
+                  >
+                    🔢 按次数
+                  </Text>
+                </Pressable>
+              </View>
+              {newKind === 'duration' ? (
+                <>
+                  <Text style={styles.label}>MET 值</Text>
+                  <TextInput
+                    style={styles.searchInput}
+                    value={newMet}
+                    onChangeText={(t) => setNewMet(t.replace(/[^0-9.]/g, ''))}
+                    keyboardType="decimal-pad"
+                    placeholder="如 5.0"
+                    placeholderTextColor={colors.textMuted}
+                  />
+                  <Text style={styles.hintText}>参考 MET：走路 3.0 · 跑步 8.0</Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.label}>每个消耗 kcal</Text>
+                  <TextInput
+                    style={styles.searchInput}
+                    value={newPerUnit}
+                    onChangeText={(t) => setNewPerUnit(t.replace(/[^0-9.]/g, ''))}
+                    keyboardType="decimal-pad"
+                    placeholder="如 0.5"
+                    placeholderTextColor={colors.textMuted}
+                  />
+                  <Text style={styles.hintText}>消耗 = 次数 × 每单位 kcal</Text>
+                </>
+              )}
               <Pressable style={styles.createBtn} onPress={handleCreate}>
                 <Text style={styles.createBtnText}>{creating ? '保存中…' : '保存'}</Text>
               </Pressable>
