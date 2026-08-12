@@ -12,6 +12,28 @@ export function calcCalories(met: number, weightKg: number, durationMin: number)
   return round1(met * weightKg * (durationMin / 60));
 }
 
+/** 次数型运动（如引体向上）：kcal = 次数 × 体重(kg) × 系数 */
+export function calcRepsCalories(
+  reps: number,
+  weightKg: number,
+  factor: number
+): number {
+  if (!isFinite(reps) || !isFinite(weightKg) || !isFinite(factor)) return 0;
+  if (reps <= 0 || weightKg <= 0 || factor <= 0) return 0;
+  return round1(reps * weightKg * factor);
+}
+
+/** 重量型运动（如卧推）：kcal = 重量(kg) × 次数 × 系数 */
+export function calcWeightCalories(
+  loadKg: number,
+  reps: number,
+  factor: number
+): number {
+  if (!isFinite(loadKg) || !isFinite(reps) || !isFinite(factor)) return 0;
+  if (loadKg <= 0 || reps <= 0 || factor <= 0) return 0;
+  return round1(loadKg * reps * factor);
+}
+
 /** BMI = 体重 / (身高/100)²，1 位小数；缺数据返回 null */
 export function calcBMI(weightKg: number, heightCm: number): number | null {
   if (weightKg <= 0 || heightCm <= 0) return null;

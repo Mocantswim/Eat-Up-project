@@ -37,7 +37,7 @@ export async function initDatabase(): Promise<void> {
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
       date          TEXT NOT NULL,   -- YYYY-MM-DD
       sport_type    TEXT NOT NULL,   -- 运动名称（自定义删除后历史仍显示）
-      duration_min  REAL NOT NULL,   -- 分钟
+      duration_min  REAL NOT NULL,   -- 分钟（时长型运动）
       met_value     REAL NOT NULL,   -- 计算时 MET 快照
       weight_used   REAL NOT NULL,   -- 计算时体重快照
       calories      REAL NOT NULL,   -- 消耗 kcal（1 位小数）
@@ -54,6 +54,7 @@ export async function initDatabase(): Promise<void> {
   `);
 
   await migrateUserProfileGoals(database);
+  await migrateExerciseLogFields(database);
 }
 
 /** V2 迁移：user_profile 增加每周目标列（幂等） */
@@ -66,5 +67,18 @@ async function migrateUserProfileGoals(database: SQLite.SQLiteDatabase): Promise
   }
   if (!cols.some((c) => c.name === 'weekly_goal_kcal')) {
     await database.execAsync('ALTER TABLE user_profile ADD COLUMN weekly_goal_kcal REAL');
+  }
+}
+
+/** V2 迁移：exercise_log 增加次数/重量列（次数型、重量型运动，幂等） */
+async function migrateExerciseLogFields(database: SQLite.SQLiteDatabase): Promise<void> {
+  const cols = await database.getAllAsync<{ name: string }>(
+    'PRAGMA table_info(exercise_log)'
+  );
+  if (!cols.some((c) => c.name === 'rep_count')) {
+    await database.execAsync('ALTER TABLE exercise_log ADD COLUMN rep_count REAL');
+  }
+  if (!cols.some((c) => c.name === 'load_weight')) {
+    await database.execAsync('ALTER TABLE exercise_log ADD COLUMN load_weight REAL');
   }
 }

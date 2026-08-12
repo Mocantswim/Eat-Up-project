@@ -130,7 +130,11 @@ export default function DayDetailScreen({ navigation, route }: Props) {
               <View style={styles.logInfo}>
                 <Text style={styles.logName}>{log.sportType}</Text>
                 <Text style={styles.logMeta}>
-                  {log.durationMin} 分钟 · {log.weightUsed}kg
+                  {log.kind === 'reps'
+                    ? `${log.reps} 次 · ${log.weightUsed}kg`
+                    : log.kind === 'weight'
+                    ? `${log.loadKg}kg × ${log.reps} 次`
+                    : `${log.durationMin} 分钟 · ${log.weightUsed}kg`}
                 </Text>
               </View>
               <Text style={styles.logCalories}>{log.calories.toFixed(1)} kcal</Text>

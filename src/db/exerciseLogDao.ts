@@ -1,11 +1,15 @@
 import { getDb } from './database';
-import { calcCalories } from '../utils/calc';
+import { calcCalories, calcRepsCalories, calcWeightCalories } from '../utils/calc';
+import { getSportKindByName, type SportKind } from '../constants/sports';
 
 export interface ExerciseLog {
   id: number;
   date: string;
   sportType: string;
-  durationMin: number;
+  kind: SportKind;
+  durationMin: number; // 时长型分钟（次数/重量型为 0）
+  reps: number | null; // 次数（次数/重量型）
+  loadKg: number | null; // 重量（重量型）
   metValue: number;
   weightUsed: number;
   calories: number;
@@ -17,6 +21,8 @@ interface ExerciseLogRow {
   date: string;
   sport_type: string;
   duration_min: number;
+  rep_count: number | null;
+  load_weight: number | null;
   met_value: number;
   weight_used: number;
   calories: number;
@@ -28,7 +34,10 @@ function mapRow(r: ExerciseLogRow): ExerciseLog {
     id: r.id,
     date: r.date,
     sportType: r.sport_type,
+    kind: getSportKindByName(r.sport_type),
     durationMin: r.duration_min,
+    reps: r.rep_count ?? null,
+    loadKg: r.load_weight ?? null,
     metValue: r.met_value,
     weightUsed: r.weight_used,
     calories: r.calories,
@@ -36,22 +45,43 @@ function mapRow(r: ExerciseLogRow): ExerciseLog {
   };
 }
 
-/** 新增运动：以当前体重为快照计算并写入（决策 #12 数据流原则） */
-export async function addExercise(params: {
+/** 运动输入参数（支持 时长/次数/重量 三种模式） */
+export interface ExerciseInput {
   date: string;
   sportType: string;
-  durationMin: number;
+  kind: SportKind;
+  durationMin?: number | null;
+  reps?: number | null;
+  loadKg?: number | null;
   met: number;
+  factor?: number; // 次数/重量型的换算系数
   weightKg: number;
-}): Promise<number> {
-  const calories = calcCalories(params.met, params.weightKg, params.durationMin);
+}
+
+/** 根据运动模式计算热量 */
+export function calcExerciseCalories(input: ExerciseInput): number {
+  if (input.kind === 'reps') {
+    return calcRepsCalories(input.reps ?? 0, input.weightKg, input.factor ?? 0);
+  }
+  if (input.kind === 'weight') {
+    return calcWeightCalories(input.loadKg ?? 0, input.reps ?? 0, input.factor ?? 0);
+  }
+  return calcCalories(input.met, input.weightKg, input.durationMin ?? 0);
+}
+
+/** 新增运动：以当前体重为快照计算并写入（决策 #12 数据流原则） */
+export async function addExercise(params: ExerciseInput): Promise<number> {
+  const calories = calcExerciseCalories(params);
+  const durationMin = params.kind === 'duration' ? params.durationMin ?? 0 : 0;
   const db = getDb();
   const result = await db.runAsync(
-    `INSERT INTO exercise_log (date, sport_type, duration_min, met_value, weight_used, calories, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO exercise_log (date, sport_type, duration_min, rep_count, load_weight, met_value, weight_used, calories, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     params.date,
     params.sportType,
-    params.durationMin,
+    durationMin,
+    params.reps ?? null,
+    params.loadKg ?? null,
     params.met,
     params.weightKg,
     calories,
@@ -61,16 +91,16 @@ export async function addExercise(params: {
 }
 
 /** 编辑运动：重新计算热量，weight_used 更新为编辑时当前体重 */
-export async function updateExercise(
-  id: number,
-  params: { sportType: string; durationMin: number; met: number; weightKg: number }
-): Promise<void> {
-  const calories = calcCalories(params.met, params.weightKg, params.durationMin);
+export async function updateExercise(id: number, params: ExerciseInput): Promise<void> {
+  const calories = calcExerciseCalories(params);
+  const durationMin = params.kind === 'duration' ? params.durationMin ?? 0 : 0;
   const db = getDb();
   await db.runAsync(
-    'UPDATE exercise_log SET sport_type = ?, duration_min = ?, met_value = ?, weight_used = ?, calories = ? WHERE id = ?',
+    `UPDATE exercise_log SET sport_type=?, duration_min=?, rep_count=?, load_weight=?, met_value=?, weight_used=?, calories=? WHERE id=?`,
     params.sportType,
-    params.durationMin,
+    durationMin,
+    params.reps ?? null,
+    params.loadKg ?? null,
     params.met,
     params.weightKg,
     calories,
