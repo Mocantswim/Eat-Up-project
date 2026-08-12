@@ -24,8 +24,21 @@ export default function WorkoutTimer() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
   };
 
+  // 解析训练总秒数（分×60+秒；空值默认 1 分；0 分 0 秒兜底 60 秒）
+  const parseWorkSec = (): number => {
+    const m = parseInt(workMin, 10);
+    const s = parseInt(workSec, 10);
+    const total = (Number.isFinite(m) ? m : 1) * 60 + (Number.isFinite(s) ? s : 0);
+    return total > 0 ? total : 60;
+  };
+  // 解析休息秒数（空值默认 30，允许 0）
+  const parseRestSec = (): number => {
+    const r = parseInt(restSec, 10);
+    return Number.isFinite(r) ? r : 30;
+  };
+
   const start = () => {
-    const w = (parseInt(workMin, 10) || 1) * 60 + (parseInt(workSec, 10) || 0);
+    const w = parseWorkSec();
     setPhase('training');
     setGroup(1);
     setSeconds(w);
@@ -40,13 +53,13 @@ export default function WorkoutTimer() {
       if (group >= (parseInt(groups, 10) || 3)) {
         setStatus('finished');
       } else {
-        const r = parseInt(restSec, 10) || 30;
+        const r = parseRestSec();
         setPhase('rest');
         setSeconds(r);
         setTotalSeconds(r);
       }
     } else {
-      const w = (parseInt(workMin, 10) || 1) * 60 + (parseInt(workSec, 10) || 0);
+      const w = parseWorkSec();
       setPhase('training');
       setGroup((g) => g + 1);
       setSeconds(w);
