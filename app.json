@@ -20,7 +20,15 @@
         }
       ],
       "./app.plugin.js",
-      "expo-sqlite"
-    ]
+      "expo-sqlite",
+      "expo-updates"
+    ],
+    "updates": {
+      "enabled": true,
+      "fallbackToCacheTimeout": 0
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    }
   }
 }
