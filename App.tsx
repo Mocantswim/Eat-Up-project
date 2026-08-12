@@ -8,6 +8,7 @@ import { hasProfile } from './src/db/userProfileDao';
 import RootNavigator from './src/navigation/RootNavigator';
 import CoverScreen from './src/components/CoverScreen';
 import { onDataCleared } from './src/utils/events';
+import { autoCheckUpdate } from './src/utils/updateSync';
 import { colors } from './src/theme/theme';
 
 export default function App() {
@@ -18,6 +19,7 @@ export default function App() {
   useEffect(() => {
     // 数据被清除后回到引导页
     const off = onDataCleared(() => setNeedsOnboarding(true));
+    autoCheckUpdate(); // 启动时后台检查 OTA 更新（不阻塞 UI）
     (async () => {
       try {
         await initDatabase();

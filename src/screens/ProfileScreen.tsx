@@ -9,6 +9,7 @@ import { getProfile, type UserProfile } from '../db/userProfileDao';
 import { clearAllData } from '../db/statsDao';
 import { calcBMI, calcBMR } from '../utils/calc';
 import { emitDataCleared } from '../utils/events';
+import { manualCheckUpdate } from '../utils/updateSync';
 import type { ProfileStackParamList } from '../navigation/types';
 import { colors, contentPadding, fontFamily, fontSize, radius, spacing } from '../theme/theme';
 
@@ -87,6 +88,11 @@ export default function ProfileScreen({ navigation }: Props) {
           onPress={() => navigation.navigate('CustomSports')}
         />
         <MenuItem
+          icon="refresh-outline"
+          label="检查更新"
+          onPress={handleCheckUpdate}
+        />
+        <MenuItem
           icon="information-circle-outline"
           label="关于"
           onPress={() => navigation.navigate('About')}
@@ -102,6 +108,14 @@ export default function ProfileScreen({ navigation }: Props) {
       </ScrollView>
     </View>
   );
+}
+
+/** 手动检查更新 */
+async function handleCheckUpdate() {
+  const r = await manualCheckUpdate();
+  if (r === 'latest') Alert.alert('已是最新版本', '当前已是最新版本 ✓');
+  else if (r === 'error') Alert.alert('检查失败', '当前为开发模式或网络异常');
+  // 'updated' 已触发应用重载
 }
 
 /** 清除所有数据：二次确认，清库后回到引导页 */
