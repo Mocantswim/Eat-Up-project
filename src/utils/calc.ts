@@ -34,6 +34,17 @@ export function calcWeightCalories(
   return round1(loadKg * reps * factor);
 }
 
+/** 距离型运动（如跑步）：kcal = 距离(km) × 体重(kg) × 系数 */
+export function calcDistanceCalories(
+  distanceKm: number,
+  weightKg: number,
+  factor: number
+): number {
+  if (!isFinite(distanceKm) || !isFinite(weightKg) || !isFinite(factor)) return 0;
+  if (distanceKm <= 0 || weightKg <= 0 || factor <= 0) return 0;
+  return round1(distanceKm * weightKg * factor);
+}
+
 /** BMI = 体重 / (身高/100)²，1 位小数；缺数据返回 null */
 export function calcBMI(weightKg: number, heightCm: number): number | null {
   if (weightKg <= 0 || heightCm <= 0) return null;

@@ -29,28 +29,41 @@ interface SportOption {
   met: number;
   emoji: string;
   custom: boolean;
-  kind: SportKind;
+  kind: SportKind; // 默认模式
+  modes?: SportKind[]; // 可用记录模式
   factor?: number;
   perUnitKcal?: number; // 自定义次数型：每 1 个消耗 kcal
   addBodyWeight?: boolean; // 重量型：含自重（深蹲）
+  distanceFactor?: number; // 距离型
 }
+
+// 模式中文标签
+const MODE_LABELS: Record<SportKind, string> = {
+  duration: '⏱ 按时长',
+  reps: '🔢 按次数',
+  weight: '🏋️ 重量',
+  distance: '📏 按距离',
+};
 
 /** 添加/编辑运动（策划书 §2.1.3，支持 时长/次数/重量 三种模式） */
 export default function AddEditExerciseScreen({ navigation, route }: Props) {
-  const { date, logId } = route.params;
+  const { date, logId, prefillSport, prefillDurationMin } = route.params;
   const isEdit = logId != null;
 
   const [options, setOptions] = useState<SportOption[]>([]);
   const [selected, setSelected] = useState<SportOption | null>(null);
+  const [selectedMode, setSelectedMode] = useState<SportKind>('duration');
   const [duration, setDuration] = useState('');
   const [reps, setReps] = useState('');
   const [loadKg, setLoadKg] = useState('');
+  const [distanceKm, setDistanceKm] = useState('');
   const [note, setNote] = useState('');
   const [noteHeight, setNoteHeight] = useState(42);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [keyword, setKeyword] = useState('');
   const [saving, setSaving] = useState(false);
+  const [prefillApplied, setPrefillApplied] = useState(false);
 
   const loadBase = useCallback(async () => {
     const [customs, p] = await Promise.all([getAllCustomSports(), getProfile()]);
@@ -61,8 +74,10 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
         emoji: s.emoji,
         custom: false,
         kind: s.kind,
+        modes: s.modes,
         factor: s.kind === 'reps' ? s.repFactor : s.kind === 'weight' ? s.weightFactor : undefined,
         addBodyWeight: s.addBodyWeight,
+        distanceFactor: s.distanceFactor,
       })),
       ...customs.map((c) => ({
         name: c.name,
@@ -70,6 +85,7 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
         emoji: '🏅',
         custom: true,
         kind: c.kind ?? 'duration',
+        modes: [c.kind ?? 'duration'],
         perUnitKcal: c.perUnitKcal ?? undefined,
       })),
     ]);
@@ -100,6 +116,7 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
           perUnitKcal: log.perUnitKcal ?? undefined,
           addBodyWeight: getSportAddBodyWeight(log.sportType),
         });
+        setSelectedMode(log.kind);
         setDuration(log.kind === 'duration' && log.durationMin > 0 ? String(log.durationMin) : '');
         setReps(log.reps != null ? String(log.reps) : '');
         setLoadKg(log.loadKg != null ? String(log.loadKg) : '');
@@ -108,6 +125,19 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
     })();
   }, [logId]);
 
+  // 计时器打通：options 加载后应用预填（运动类型 + 时长）
+  useEffect(() => {
+    if (isEdit || prefillApplied || !prefillSport || options.length === 0) return;
+    const opt = options.find((o) => o.name === prefillSport && o.kind === 'duration');
+    if (opt) {
+      setSelected(opt);
+      if (prefillDurationMin && prefillDurationMin > 0) {
+        setDuration(String(prefillDurationMin));
+      }
+    }
+    setPrefillApplied(true);
+  }, [options, prefillSport, prefillDurationMin, isEdit, prefillApplied]);
+
   const filtered = useMemo(() => {
     if (!keyword.trim()) return options;
     return options.filter((o) => o.name.includes(keyword.trim()));
@@ -115,7 +145,8 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
 
   const estimated = useMemo(() => {
     if (!selected || !profile?.weight) return 0;
-    if (selected.kind === 'reps') {
+    const mode = selectedMode;
+    if (mode === 'reps') {
       const r = parseFloat(reps);
       if (isNaN(r) || r <= 0) return 0;
       return calcExerciseCalories({
@@ -124,7 +155,7 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
         perUnitKcal: selected.perUnitKcal, weightKg: profile.weight,
       });
     }
-    if (selected.kind === 'weight') {
+    if (mode === 'weight') {
       const w = parseFloat(loadKg);
       const r = parseFloat(reps);
       if (isNaN(w) || w <= 0 || isNaN(r) || r <= 0) return 0;
@@ -134,13 +165,21 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
         addBodyWeight: selected.addBodyWeight, weightKg: profile.weight,
       });
     }
+    if (mode === 'distance') {
+      const km = parseFloat(distanceKm);
+      if (isNaN(km) || km <= 0) return 0;
+      return calcExerciseCalories({
+        date, sportType: selected.name, kind: 'distance', distance: km,
+        met: selected.met, factor: selected.distanceFactor ?? 0, weightKg: profile.weight,
+      });
+    }
     const d = parseFloat(duration);
     if (isNaN(d) || d <= 0) return 0;
     return calcExerciseCalories({
       date, sportType: selected.name, kind: 'duration', durationMin: d,
       met: selected.met, weightKg: profile.weight,
     });
-  }, [selected, duration, reps, loadKg, profile, date]);
+  }, [selected, selectedMode, duration, reps, loadKg, distanceKm, profile, date]);
 
   const handleSave = async () => {
     if (saving) return;
@@ -161,7 +200,7 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
       note: note.trim() || null,
     };
     let input;
-    if (selected.kind === 'reps') {
+    if (selectedMode === 'reps') {
       const r = parseInt(reps, 10);
       if (!reps.trim() || isNaN(r) || r <= 0 || r > 9999) {
         Alert.alert('提示', '请输入有效的次数（1-9999）');
@@ -174,7 +213,7 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
         factor: selected.factor ?? getSportFactor(selected.name),
         perUnitKcal: selected.perUnitKcal,
       };
-    } else if (selected.kind === 'weight') {
+    } else if (selectedMode === 'weight') {
       const w = parseFloat(loadKg);
       const r = parseInt(reps, 10);
       if (!loadKg.trim() || isNaN(w) || w <= 0 || w > 500) {
@@ -192,6 +231,18 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
         reps: r,
         factor: selected.factor ?? getSportFactor(selected.name),
         addBodyWeight: selected.addBodyWeight,
+      };
+    } else if (selectedMode === 'distance') {
+      const km = parseFloat(distanceKm);
+      if (!distanceKm.trim() || isNaN(km) || km <= 0 || km > 500) {
+        Alert.alert('提示', '请输入有效的距离（km）');
+        return;
+      }
+      input = {
+        ...base,
+        kind: 'distance' as SportKind,
+        distance: km,
+        factor: selected.distanceFactor ?? 0,
       };
     } else {
       const d = parseFloat(duration);
@@ -225,7 +276,7 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
   /** 从选择器内新增自定义运动后：选中它并刷新列表 */
   const handleSportCreated = useCallback(
     async (name: string, met: number, kind: SportKind = 'duration', perUnitKcal?: number) => {
-      setSelected({ name, met, emoji: '🏅', custom: true, kind, perUnitKcal });
+      setSelected({ name, met, emoji: '🏅', custom: true, kind, perUnitKcal, modes: [kind] });
       setPickerVisible(false);
       setKeyword('');
       await loadBase();
@@ -255,8 +306,31 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
           <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
         </Pressable>
 
-        {/* 输入区：按时长/次数/重量三种模式动态显示 */}
-        {(!selected || selected.kind === 'duration') && (
+        {/* 记录方式切换（该运动支持多种模式时显示） */}
+        {selected && (selected.modes?.length ?? 1) > 1 && (
+          <>
+            <Text style={styles.label}>记录方式</Text>
+            <View style={styles.quickRow}>
+              {(selected.modes ?? []).map((m) => {
+                const active = selectedMode === m;
+                return (
+                  <Pressable
+                    key={m}
+                    style={[styles.quickBtn, active && styles.quickBtnActive]}
+                    onPress={() => setSelectedMode(m)}
+                  >
+                    <Text style={[styles.quickBtnText, active && styles.quickBtnTextActive]}>
+                      {MODE_LABELS[m]}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
+        )}
+
+        {/* 输入区：按所选记录方式动态显示 */}
+        {(!selected || selectedMode === 'duration') && (
           <>
             <Text style={styles.label}>时长（分钟）*</Text>
             <View style={styles.durationRow}>
@@ -289,7 +363,7 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
           </>
         )}
 
-        {selected?.kind === 'reps' && (
+        {selected && selectedMode === 'reps' && (
           <>
             <Text style={styles.label}>次数 *</Text>
             <View style={styles.durationRow}>
@@ -309,7 +383,7 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
           </>
         )}
 
-        {selected?.kind === 'weight' && (
+        {selected && selectedMode === 'weight' && (
           <>
             <Text style={styles.label}>重量（kg）*</Text>
             <View style={styles.durationRow}>
@@ -339,6 +413,26 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
               {selected.addBodyWeight
                 ? `按（体重 ${profile?.weight ?? '?'}kg + 配重）× 次数估算`
                 : '按重量 × 次数估算'}
+            </Text>
+          </>
+        )}
+
+        {selected && selectedMode === 'distance' && (
+          <>
+            <Text style={styles.label}>距离（km）*</Text>
+            <View style={styles.durationRow}>
+              <TextInput
+                style={styles.durationInput}
+                value={distanceKm}
+                onChangeText={(t) => setDistanceKm(t.replace(/[^0-9.]/g, ''))}
+                keyboardType="numeric"
+                placeholder="如 5"
+                placeholderTextColor={colors.textMuted}
+              />
+              <Text style={styles.durationUnit}>km</Text>
+            </View>
+            <Text style={styles.hintText}>
+              按距离 × 体重({profile?.weight ?? '?'}kg) 估算
             </Text>
           </>
         )}
@@ -386,6 +480,7 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
         onKeywordChange={setKeyword}
         onSelect={(o) => {
           setSelected(o);
+          setSelectedMode(o.kind);
           setPickerVisible(false);
           setKeyword('');
         }}

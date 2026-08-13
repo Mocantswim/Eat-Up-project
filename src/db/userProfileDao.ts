@@ -89,3 +89,13 @@ export async function hasProfile(): Promise<boolean> {
   const p = await getProfile();
   return p != null && p.weight != null && p.weight > 0;
 }
+
+/** 仅更新当前体重（详情页记录今日体重时同步，新运动用最新体重） */
+export async function updateCurrentWeight(weight: number): Promise<void> {
+  const db = getDb();
+  await db.runAsync(
+    'UPDATE user_profile SET weight = ?, updated_at = ? WHERE id = 1',
+    weight,
+    new Date().toISOString()
+  );
+}

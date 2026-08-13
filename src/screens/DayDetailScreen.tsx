@@ -25,6 +25,7 @@ import {
   type ExerciseLog,
 } from '../db/exerciseLogDao';
 import { getWeightByDate, upsertWeight } from '../db/weightRecordDao';
+import { updateCurrentWeight } from '../db/userProfileDao';
 import { builtinEmojiByName } from '../constants/sports';
 import { dayTitle } from '../utils/date';
 import { shouldTriggerConfetti } from '../utils/confetti';
@@ -71,7 +72,8 @@ export default function DayDetailScreen({ navigation, route }: Props) {
       return;
     }
     await upsertWeight(date, w);
-    Alert.alert('已保存', '当日体重已记录，用于体重趋势图');
+    await updateCurrentWeight(w); // 同步为当前体重（"我的"页 & 新运动计算）
+    Alert.alert('已保存', '当日体重已记录，并同步为当前体重');
   };
 
   const handleDelete = (id: number) => {
@@ -86,6 +88,15 @@ export default function DayDetailScreen({ navigation, route }: Props) {
         },
       },
     ]);
+  };
+
+  /** 计时器结束 → 跳转添加运动并预填运动类型+时长 */
+  const handleTimerFinish = (sport: string, durationMin: number) => {
+    navigation.navigate('AddEditExercise', {
+      date,
+      prefillSport: sport,
+      prefillDurationMin: durationMin,
+    });
   };
 
   return (
@@ -122,7 +133,7 @@ export default function DayDetailScreen({ navigation, route }: Props) {
         </View>
 
         {/* 内置训练计时器 */}
-        <WorkoutTimer />
+        <WorkoutTimer onFinish={handleTimerFinish} />
 
         {/* 运动列表 */}
         <Text style={styles.sectionTitle}>运动记录</Text>
@@ -140,6 +151,8 @@ export default function DayDetailScreen({ navigation, route }: Props) {
                       ? `${log.reps} 次 · ${log.weightUsed}kg`
                       : log.kind === 'weight'
                       ? `${log.loadKg}kg × ${log.reps} 次`
+                      : log.kind === 'distance'
+                      ? `${log.distance} km · ${log.weightUsed}kg`
                       : `${log.durationMin} 分钟 · ${log.weightUsed}kg`}
                   </Text>
                 </View>

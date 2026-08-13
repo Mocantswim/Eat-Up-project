@@ -58,6 +58,7 @@ export async function initDatabase(): Promise<void> {
   await migrateCustomSportsKind(database);
   await migrateExerciseLogKind(database);
   await migrateExerciseLogNote(database);
+  await migrateExerciseLogDistance(database);
 }
 
 /** V2 迁移：user_profile 增加每周目标列（幂等） */
@@ -123,5 +124,15 @@ async function migrateExerciseLogNote(database: SQLite.SQLiteDatabase): Promise<
   );
   if (!cols.some((c) => c.name === 'note')) {
     await database.execAsync('ALTER TABLE exercise_log ADD COLUMN note TEXT');
+  }
+}
+
+/** V2 迁移：exercise_log 增加距离列（距离型运动，如跑步按 km） */
+async function migrateExerciseLogDistance(database: SQLite.SQLiteDatabase): Promise<void> {
+  const cols = await database.getAllAsync<{ name: string }>(
+    'PRAGMA table_info(exercise_log)'
+  );
+  if (!cols.some((c) => c.name === 'distance')) {
+    await database.execAsync('ALTER TABLE exercise_log ADD COLUMN distance REAL');
   }
 }
