@@ -68,6 +68,7 @@ export interface ExerciseInput {
   factor?: number; // 次数/重量型的换算系数
   perUnitKcal?: number | null; // 次数型自定义：每 1 个消耗 kcal
   addBodyWeight?: boolean; // 重量型：是否计入体重（如深蹲含自重）
+  distanceKcal?: number | null; // 自定义距离型：每 1 km 消耗 kcal
   note?: string | null; // 运动笔记（选填，≤100字）
   weightKg: number;
 }
@@ -87,6 +88,8 @@ export function calcExerciseCalories(input: ExerciseInput): number {
     return calcWeightCalories(base, input.reps ?? 0, input.factor ?? 0);
   }
   if (input.kind === 'distance') {
+    // 自定义距离：距离 × 每 km kcal；内置：距离 × 体重 × 系数
+    if (input.distanceKcal) return round1((input.distance ?? 0) * input.distanceKcal);
     return calcDistanceCalories(input.distance ?? 0, input.weightKg, input.factor ?? 0);
   }
   return calcCalories(input.met, input.weightKg, input.durationMin ?? 0);

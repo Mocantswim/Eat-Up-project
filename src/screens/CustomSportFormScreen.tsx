@@ -35,6 +35,8 @@ export default function CustomSportFormScreen({ navigation, route }: Props) {
   const [kind, setKind] = useState<SportKind>('duration');
   const [met, setMet] = useState('');
   const [perUnitKcal, setPerUnitKcal] = useState('');
+  const [distanceKcal, setDistanceKcal] = useState('');
+  const [weightFactor, setWeightFactor] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -47,6 +49,8 @@ export default function CustomSportFormScreen({ navigation, route }: Props) {
         setKind(sport.kind ?? 'duration');
         setMet(String(sport.metValue));
         setPerUnitKcal(sport.perUnitKcal != null ? String(sport.perUnitKcal) : '');
+        setDistanceKcal(sport.distanceKcal != null ? String(sport.distanceKcal) : '');
+        setWeightFactor(sport.weightFactor != null ? String(sport.weightFactor) : '');
       }
     })();
   }, [isEdit, sportId]);
@@ -54,37 +58,36 @@ export default function CustomSportFormScreen({ navigation, route }: Props) {
   const handleSave = async () => {
     if (saving) return;
     const trimmed = name.trim();
-    if (!trimmed) {
-      Alert.alert('提示', '请输入运动名称');
-      return;
-    }
-    const isReps = kind === 'reps';
+    if (!trimmed) { Alert.alert('提示', '请输入运动名称'); return; }
     const mv = parseFloat(met);
     const pk = parseFloat(perUnitKcal);
-    if (isReps) {
-      if (!perUnitKcal.trim() || isNaN(pk) || pk <= 0 || pk > 100) {
-        Alert.alert('提示', '请输入每个消耗 kcal（0.1–100）');
-        return;
-      }
-    } else if (!met.trim() || isNaN(mv) || mv <= 0 || mv > 16) {
-      Alert.alert('提示', '请输入有效 MET 值（1.0–16.0）');
-      return;
+    const dk = parseFloat(distanceKcal);
+    const wf = parseFloat(weightFactor);
+    if (kind === 'duration') {
+      if (!met.trim() || isNaN(mv) || mv <= 0 || mv > 16) { Alert.alert('提示', '请输入有效 MET 值（1.0–16.0）'); return; }
+    } else if (kind === 'reps') {
+      if (!perUnitKcal.trim() || isNaN(pk) || pk <= 0 || pk > 100) { Alert.alert('提示', '请输入每 1 个消耗 kcal（0.1–100）'); return; }
+    } else if (kind === 'distance') {
+      if (!distanceKcal.trim() || isNaN(dk) || dk <= 0 || dk > 500) { Alert.alert('提示', '请输入每 1 公里消耗 kcal'); return; }
+    } else {
+      if (!weightFactor.trim() || isNaN(wf) || wf <= 0 || wf > 10) { Alert.alert('提示', '请输入每 1kg×1 次消耗 kcal'); return; }
     }
-    if (BUILTIN_SPORTS.some((s) => s.name === trimmed)) {
-      Alert.alert('提示', '该名称与内置运动重复，无需新建');
-      return;
-    }
-    if (await customSportNameExists(trimmed, sportId)) {
-      Alert.alert('提示', '该运动名称已存在');
-      return;
-    }
+    if (BUILTIN_SPORTS.some((s) => s.name === trimmed)) { Alert.alert('提示', '该名称与内置运动重复，无需新建'); return; }
+    if (await customSportNameExists(trimmed, sportId)) { Alert.alert('提示', '该运动名称已存在'); return; }
 
+    const metVal = kind === 'duration' ? mv : 0;
     setSaving(true);
     try {
       if (isEdit && sportId != null) {
-        await updateCustomSport(sportId, trimmed, isReps ? 0 : mv, kind, isReps ? pk : null);
+        await updateCustomSport(sportId, trimmed, metVal, kind,
+          kind === 'reps' ? pk : null,
+          kind === 'distance' ? dk : null,
+          kind === 'weight' ? wf : null);
       } else {
-        await addCustomSport(trimmed, isReps ? 0 : mv, kind, isReps ? pk : null);
+        await addCustomSport(trimmed, metVal, kind,
+          kind === 'reps' ? pk : null,
+          kind === 'distance' ? dk : null,
+          kind === 'weight' ? wf : null);
       }
       navigation.goBack();
     } catch (e) {
@@ -112,27 +115,30 @@ export default function CustomSportFormScreen({ navigation, route }: Props) {
             maxLength={12}
           />
 
-          <Text style={styles.label}>计算方式 *</Text>
-          <View style={styles.kindRow}>
-            <Pressable
-              style={[styles.kindBtn, kind === 'duration' && styles.kindBtnActive]}
-              onPress={() => setKind('duration')}
-            >
-              <Text style={[styles.kindBtnText, kind === 'duration' && styles.kindBtnTextActive]}>
-                ⏱ 按时长
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[styles.kindBtn, kind === 'reps' && styles.kindBtnActive]}
-              onPress={() => setKind('reps')}
-            >
-              <Text style={[styles.kindBtnText, kind === 'reps' && styles.kindBtnTextActive]}>
-                🔢 按次数
-              </Text>
-            </Pressable>
+          <Text style={styles.label}>记录方式 *</Text>
+          <View style={styles.kindGrid}>
+            {(
+              [
+                ['duration', '⏱ 按时长'],
+                ['reps', '🔢 个数'],
+                ['distance', '📏 距离'],
+                ['weight', '🏋️ 重量'],
+              ] as [SportKind, string][]
+            ).map(([k, label]) => {
+              const active = kind === k;
+              return (
+                <Pressable
+                  key={k}
+                  style={[styles.kindBtn, styles.kindBtnHalf, active && styles.kindBtnActive]}
+                  onPress={() => setKind(k)}
+                >
+                  <Text style={[styles.kindBtnText, active && styles.kindBtnTextActive]}>{label}</Text>
+                </Pressable>
+              );
+            })}
           </View>
 
-          {kind === 'duration' ? (
+          {kind === 'duration' && (
             <>
               <Text style={styles.label}>MET 值 *</Text>
               <TextInput
@@ -145,7 +151,8 @@ export default function CustomSportFormScreen({ navigation, route }: Props) {
               />
               <Text style={styles.hint}>{MET_REFERENCE}</Text>
             </>
-          ) : (
+          )}
+          {kind === 'reps' && (
             <>
               <Text style={styles.label}>每 1 个消耗（kcal）*</Text>
               <TextInput
@@ -156,7 +163,35 @@ export default function CustomSportFormScreen({ navigation, route }: Props) {
                 placeholder="如 0.5"
                 placeholderTextColor={colors.textMuted}
               />
-              <Text style={styles.hint}>记录时输入次数，消耗 = 次数 × 每单位 kcal</Text>
+              <Text style={styles.hint}>记录时输入个数，消耗 = 个数 × 每单位 kcal</Text>
+            </>
+          )}
+          {kind === 'distance' && (
+            <>
+              <Text style={styles.label}>每 1 公里消耗（kcal）*</Text>
+              <TextInput
+                style={styles.input}
+                value={distanceKcal}
+                onChangeText={(t) => setDistanceKcal(t.replace(/[^0-9.]/g, ''))}
+                keyboardType="decimal-pad"
+                placeholder="如 60"
+                placeholderTextColor={colors.textMuted}
+              />
+              <Text style={styles.hint}>记录时输入距离(km)，消耗 = 距离 × 每公里 kcal</Text>
+            </>
+          )}
+          {kind === 'weight' && (
+            <>
+              <Text style={styles.label}>每 1kg×1 次消耗（kcal）*</Text>
+              <TextInput
+                style={styles.input}
+                value={weightFactor}
+                onChangeText={(t) => setWeightFactor(t.replace(/[^0-9.]/g, ''))}
+                keyboardType="decimal-pad"
+                placeholder="如 0.02"
+                placeholderTextColor={colors.textMuted}
+              />
+              <Text style={styles.hint}>记录时输入重量(kg)和次数，消耗 = 重量 × 次数 × 系数</Text>
             </>
           )}
 
@@ -207,6 +242,15 @@ const styles = StyleSheet.create({
   kindRow: {
     flexDirection: 'row',
     gap: spacing.sm,
+  },
+  kindGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  kindBtnHalf: {
+    flexBasis: '48%',
+    flexGrow: 1,
   },
   kindBtn: {
     flex: 1,

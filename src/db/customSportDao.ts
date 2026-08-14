@@ -7,6 +7,8 @@ export interface CustomSport {
   metValue: number;
   kind: SportKind;
   perUnitKcal: number | null; // 次数型：每 1 个消耗 kcal
+  distanceKcal: number | null; // 距离型：每 1 km 消耗 kcal
+  weightFactor: number | null; // 重量型：每 kg×1 次消耗 kcal
 }
 
 interface CustomSportRow {
@@ -15,6 +17,8 @@ interface CustomSportRow {
   met_value: number;
   kind: SportKind;
   per_unit_kcal: number | null;
+  distance_kcal: number | null;
+  weight_factor: number | null;
 }
 
 function mapRow(r: CustomSportRow): CustomSport {
@@ -24,13 +28,15 @@ function mapRow(r: CustomSportRow): CustomSport {
     metValue: r.met_value,
     kind: r.kind ?? 'duration',
     perUnitKcal: r.per_unit_kcal ?? null,
+    distanceKcal: r.distance_kcal ?? null,
+    weightFactor: r.weight_factor ?? null,
   };
 }
 
 export async function getAllCustomSports(): Promise<CustomSport[]> {
   const db = getDb();
   const rows = await db.getAllAsync<CustomSportRow>(
-    'SELECT id, name, met_value, kind, per_unit_kcal FROM custom_sports ORDER BY name ASC'
+    'SELECT id, name, met_value, kind, per_unit_kcal, distance_kcal, weight_factor FROM custom_sports ORDER BY name ASC'
   );
   return rows.map(mapRow);
 }
@@ -39,15 +45,19 @@ export async function addCustomSport(
   name: string,
   metValue: number,
   kind: SportKind = 'duration',
-  perUnitKcal?: number | null
+  perUnitKcal?: number | null,
+  distanceKcal?: number | null,
+  weightFactor?: number | null
 ): Promise<number> {
   const db = getDb();
   const result = await db.runAsync(
-    'INSERT INTO custom_sports (name, met_value, kind, per_unit_kcal) VALUES (?, ?, ?, ?)',
+    'INSERT INTO custom_sports (name, met_value, kind, per_unit_kcal, distance_kcal, weight_factor) VALUES (?, ?, ?, ?, ?, ?)',
     name,
     metValue,
     kind,
-    perUnitKcal ?? null
+    perUnitKcal ?? null,
+    distanceKcal ?? null,
+    weightFactor ?? null
   );
   return result.lastInsertRowId;
 }
@@ -57,15 +67,19 @@ export async function updateCustomSport(
   name: string,
   metValue: number,
   kind: SportKind = 'duration',
-  perUnitKcal?: number | null
+  perUnitKcal?: number | null,
+  distanceKcal?: number | null,
+  weightFactor?: number | null
 ): Promise<void> {
   const db = getDb();
   await db.runAsync(
-    'UPDATE custom_sports SET name = ?, met_value = ?, kind = ?, per_unit_kcal = ? WHERE id = ?',
+    'UPDATE custom_sports SET name = ?, met_value = ?, kind = ?, per_unit_kcal = ?, distance_kcal = ?, weight_factor = ? WHERE id = ?',
     name,
     metValue,
     kind,
     perUnitKcal ?? null,
+    distanceKcal ?? null,
+    weightFactor ?? null,
     id
   );
 }

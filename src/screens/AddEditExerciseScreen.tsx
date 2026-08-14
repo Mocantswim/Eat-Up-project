@@ -1,17 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Header from '../components/Header';
 import SportIcon from '../components/SportIcon';
-import { BUILTIN_SPORTS, getSportAddBodyWeight, getSportFactor, type SportKind } from '../constants/sports';
+import { BUILTIN_SPORTS, getSportAddBodyWeight, getSportFactor, MUSCLE_GROUPS, type SportKind } from '../constants/sports';
 import {
   addExercise,
   calcExerciseCalories,
   getExerciseById,
   updateExercise,
+  type ExerciseInput,
 } from '../db/exerciseLogDao';
 import {
   addCustomSport,
@@ -35,6 +37,11 @@ interface SportOption {
   perUnitKcal?: number; // 自定义次数型：每 1 个消耗 kcal
   addBodyWeight?: boolean; // 重量型：含自重（深蹲）
   distanceFactor?: number; // 距离型
+  distanceKcal?: number; // 自定义距离型：每 km kcal
+  weightFactor?: number; // 自定义重量型
+  groupId?: string;
+  groupName?: string;
+  typeName?: string;
 }
 
 // 模式中文标签
@@ -69,6 +76,7 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
     const [customs, p] = await Promise.all([getAllCustomSports(), getProfile()]);
     setOptions([
       ...BUILTIN_SPORTS.map((s) => ({
+        id: s.id,
         name: s.name,
         met: s.met,
         emoji: s.emoji,
@@ -78,8 +86,12 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
         factor: s.kind === 'reps' ? s.repFactor : s.kind === 'weight' ? s.weightFactor : undefined,
         addBodyWeight: s.addBodyWeight,
         distanceFactor: s.distanceFactor,
+        groupId: s.groupId,
+        groupName: s.groupName,
+        typeName: s.typeName,
       })),
       ...customs.map((c) => ({
+        id: `custom-${c.name}`,
         name: c.name,
         met: c.metValue,
         emoji: '🏅',
@@ -87,6 +99,11 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
         kind: c.kind ?? 'duration',
         modes: [c.kind ?? 'duration'],
         perUnitKcal: c.perUnitKcal ?? undefined,
+        distanceKcal: c.distanceKcal ?? undefined,
+        weightFactor: c.weightFactor ?? undefined,
+        groupId: 'custom',
+        groupName: '自定义',
+        typeName: '自定义',
       })),
     ]);
     setProfile(p);
@@ -139,8 +156,12 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
   }, [options, prefillSport, prefillDurationMin, isEdit, prefillApplied]);
 
   const filtered = useMemo(() => {
-    if (!keyword.trim()) return options;
-    return options.filter((o) => o.name.includes(keyword.trim()));
+    const kw = keyword.trim();
+    if (!kw) return options;
+    // 全搜索：动作名 / 类型名 / 肌群名 均可匹配
+    return options.filter((o) =>
+      `${o.name} ${o.typeName ?? ''} ${o.groupName ?? ''}`.includes(kw)
+    );
   }, [options, keyword]);
 
   const estimated = useMemo(() => {
@@ -170,7 +191,8 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
       if (isNaN(km) || km <= 0) return 0;
       return calcExerciseCalories({
         date, sportType: selected.name, kind: 'distance', distance: km,
-        met: selected.met, factor: selected.distanceFactor ?? 0, weightKg: profile.weight,
+        met: selected.met, factor: selected.distanceFactor ?? 0,
+        distanceKcal: selected.distanceKcal, weightKg: profile.weight,
       });
     }
     const d = parseFloat(duration);
@@ -243,6 +265,7 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
         kind: 'distance' as SportKind,
         distance: km,
         factor: selected.distanceFactor ?? 0,
+        distanceKcal: selected.distanceKcal,
       };
     } else {
       const d = parseFloat(duration);
@@ -273,15 +296,66 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
     }
   };
 
-  /** 从选择器内新增自定义运动后：选中它并刷新列表 */
+  /** 从选择器内新增自定义运动后：记录本次成果到当天并返回 */
   const handleSportCreated = useCallback(
-    async (name: string, met: number, kind: SportKind = 'duration', perUnitKcal?: number) => {
-      setSelected({ name, met, emoji: '🏅', custom: true, kind, perUnitKcal, modes: [kind] });
+    async (
+      name: string,
+      met: number,
+      kind: SportKind = 'duration',
+      perUnitKcal?: number,
+      distanceKcal?: number,
+      weightFactor?: number,
+      resultA?: number,
+      resultB?: number
+    ) => {
+      // 未填成果：仅创建运动并选中（不做记录）
+      if (resultA == null) {
+        setSelected({
+          name,
+          met,
+          emoji: '🏅',
+          custom: true,
+          kind,
+          modes: [kind],
+          perUnitKcal,
+          distanceKcal,
+          weightFactor,
+        });
+        setPickerVisible(false);
+        setKeyword('');
+        await loadBase();
+        return;
+      }
+      if (!profile?.weight) {
+        Alert.alert('提示', '请先在“我的”中设置体重，才能记录');
+        return;
+      }
+      // 记录本次成果到当天
+      let input: ExerciseInput;
+      if (kind === 'duration') {
+        input = { date, sportType: name, kind, durationMin: resultA ?? 0, met, weightKg: profile.weight };
+      } else if (kind === 'reps') {
+        input = { date, sportType: name, kind, reps: resultA ?? 0, perUnitKcal, met, weightKg: profile.weight };
+      } else if (kind === 'distance') {
+        input = { date, sportType: name, kind, distance: resultA ?? 0, distanceKcal, met, weightKg: profile.weight };
+      } else {
+        input = {
+          date, sportType: name, kind, loadKg: resultB ?? 0, reps: resultA ?? 0,
+          factor: weightFactor ?? 0, met, weightKg: profile.weight,
+        };
+      }
+      try {
+        await addExercise(input);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      } catch {
+        Alert.alert('出错了', '运动已创建，但记录失败，请手动添加');
+      }
       setPickerVisible(false);
       setKeyword('');
       await loadBase();
+      navigation.goBack();
     },
-    [loadBase]
+    [date, profile, loadBase, navigation]
   );
 
   return (
@@ -510,27 +584,80 @@ function SportPicker({
   onKeywordChange: (v: string) => void;
   onSelect: (o: SportOption) => void;
   onClose: () => void;
-  onCreate?: (name: string, met: number, kind?: SportKind, perUnitKcal?: number) => void;
+  onCreate?: (
+    name: string,
+    met: number,
+    kind?: SportKind,
+    perUnitKcal?: number,
+    distanceKcal?: number,
+    weightFactor?: number,
+    resultA?: number,
+    resultB?: number
+  ) => void;
 }) {
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [newKind, setNewKind] = useState<SportKind>('duration');
   const [newMet, setNewMet] = useState('');
   const [newPerUnit, setNewPerUnit] = useState('');
+  const [newDistanceKcal, setNewDistanceKcal] = useState('');
+  const [newWeightFactor, setNewWeightFactor] = useState('');
+  const [newResultA, setNewResultA] = useState(''); // 时长/个数/距离
+  const [newResultB, setNewResultB] = useState(''); // 重量
   const [creating, setCreating] = useState(false);
+  const insets = useSafeAreaInsets();
+
+  // 按肌群分组（无搜索时折叠展示）
+  const grouped = useMemo(() => {
+    const order = MUSCLE_GROUPS.map((g) => g.name);
+    const map = new Map<string, SportOption[]>();
+    for (const o of options) {
+      const key = o.groupName ?? '其他';
+      const arr = map.get(key) ?? [];
+      arr.push(o);
+      map.set(key, arr);
+    }
+    const entries = [...map.entries()].sort(
+      (a, b) => order.indexOf(a[0]) - order.indexOf(b[0])
+    );
+    const custom = entries.find((e) => e[0] === '自定义');
+    const rest = entries.filter((e) => e[0] !== '自定义');
+    return [...rest, ...(custom ? [custom] : [])];
+  }, [options]);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(['有氧', '胸部']));
+  const toggleGroup = (name: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
 
   const handleCreate = async () => {
     if (creating) return;
     const name = newName.trim();
     const mv = parseFloat(newMet);
     const pu = parseFloat(newPerUnit);
+    const dk = parseFloat(newDistanceKcal);
+    const wf = parseFloat(newWeightFactor);
     if (!name) {
       Alert.alert('提示', '请输入运动名称');
       return;
     }
     if (newKind === 'reps') {
       if (isNaN(pu) || pu <= 0 || pu > 100) {
-        Alert.alert('提示', '请输入每个消耗 kcal（0.1–100）');
+        Alert.alert('提示', '请输入每 1 个消耗 kcal（0.1–100）');
+        return;
+      }
+    } else if (newKind === 'distance') {
+      if (isNaN(dk) || dk <= 0 || dk > 500) {
+        Alert.alert('提示', '请输入每 1 公里消耗 kcal');
+        return;
+      }
+    } else if (newKind === 'weight') {
+      if (isNaN(wf) || wf <= 0 || wf > 10) {
+        Alert.alert('提示', '请输入每 1kg×1 次消耗 kcal');
         return;
       }
     } else if (isNaN(mv) || mv <= 0) {
@@ -547,13 +674,34 @@ function SportPicker({
     }
     setCreating(true);
     try {
-      await addCustomSport(name, newKind === 'reps' ? 0 : mv, newKind, newKind === 'reps' ? pu : null);
-      onCreate?.(name, newKind === 'reps' ? 0 : mv, newKind, newKind === 'reps' ? pu : undefined);
+      const metVal = newKind === 'duration' ? mv : 0;
+      await addCustomSport(
+        name,
+        metVal,
+        newKind,
+        newKind === 'reps' ? pu : null,
+        newKind === 'distance' ? dk : null,
+        newKind === 'weight' ? wf : null
+      );
+      onCreate?.(
+        name,
+        metVal,
+        newKind,
+        newKind === 'reps' ? pu : undefined,
+        newKind === 'distance' ? dk : undefined,
+        newKind === 'weight' ? wf : undefined,
+        newResultA.trim() ? parseFloat(newResultA) : undefined,
+        newResultB.trim() ? parseFloat(newResultB) : undefined
+      );
       setShowCreate(false);
       setNewName('');
       setNewKind('duration');
       setNewMet('');
       setNewPerUnit('');
+      setNewDistanceKcal('');
+      setNewWeightFactor('');
+      setNewResultA('');
+      setNewResultB('');
     } catch {
       Alert.alert('出错了', '保存失败，请重试');
     } finally {
@@ -564,9 +712,13 @@ function SportPicker({
   return (
     <Modal visible={visible} transparent animationType="slide">
       <View style={styles.pickerOverlay}>
-        <View style={styles.pickerSheet}>
+        <View style={[styles.pickerSheet, { paddingBottom: spacing.xxl + insets.bottom }]}>
           {showCreate ? (
-            <>
+            <ScrollView
+              style={styles.createScroll}
+              contentContainerStyle={{ paddingBottom: spacing.lg }}
+              keyboardShouldPersistTaps="handled"
+            >
               <View style={styles.pickerHeader}>
                 <Text style={styles.pickerTitle}>新增自定义运动</Text>
                 <Pressable hitSlop={8} onPress={() => setShowCreate(false)}>
@@ -582,30 +734,29 @@ function SportPicker({
                 placeholderTextColor={colors.textMuted}
                 maxLength={12}
               />
-              <Text style={styles.label}>计算方式</Text>
-              <View style={styles.quickRow}>
-                <Pressable
-                  style={[styles.quickBtn, newKind === 'duration' && styles.quickBtnActive]}
-                  onPress={() => setNewKind('duration')}
-                >
-                  <Text
-                    style={[styles.quickBtnText, newKind === 'duration' && styles.quickBtnTextActive]}
-                  >
-                    ⏱ 按时长
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.quickBtn, newKind === 'reps' && styles.quickBtnActive]}
-                  onPress={() => setNewKind('reps')}
-                >
-                  <Text
-                    style={[styles.quickBtnText, newKind === 'reps' && styles.quickBtnTextActive]}
-                  >
-                    🔢 按次数
-                  </Text>
-                </Pressable>
+              <Text style={styles.label}>记录方式</Text>
+              <View style={styles.kindGrid}>
+                {(
+                  [
+                    ['duration', '⏱ 按时长'],
+                    ['reps', '🔢 个数'],
+                    ['distance', '📏 距离'],
+                    ['weight', '🏋️ 重量'],
+                  ] as [SportKind, string][]
+                ).map(([k, label]) => {
+                  const active = newKind === k;
+                  return (
+                    <Pressable
+                      key={k}
+                      style={[styles.quickBtn, styles.kindBtnHalf, active && styles.quickBtnActive]}
+                      onPress={() => setNewKind(k)}
+                    >
+                      <Text style={[styles.quickBtnText, active && styles.quickBtnTextActive]}>{label}</Text>
+                    </Pressable>
+                  );
+                })}
               </View>
-              {newKind === 'duration' ? (
+              {newKind === 'duration' && (
                 <>
                   <Text style={styles.label}>MET 值</Text>
                   <TextInput
@@ -618,9 +769,10 @@ function SportPicker({
                   />
                   <Text style={styles.hintText}>参考 MET：走路 3.0 · 跑步 8.0</Text>
                 </>
-              ) : (
+              )}
+              {newKind === 'reps' && (
                 <>
-                  <Text style={styles.label}>每个消耗 kcal</Text>
+                  <Text style={styles.label}>每 1 个消耗 kcal</Text>
                   <TextInput
                     style={styles.searchInput}
                     value={newPerUnit}
@@ -629,13 +781,103 @@ function SportPicker({
                     placeholder="如 0.5"
                     placeholderTextColor={colors.textMuted}
                   />
-                  <Text style={styles.hintText}>消耗 = 次数 × 每单位 kcal</Text>
+                  <Text style={styles.hintText}>消耗 = 个数 × 每单位 kcal</Text>
                 </>
               )}
+              {newKind === 'distance' && (
+                <>
+                  <Text style={styles.label}>每 1 公里消耗 kcal</Text>
+                  <TextInput
+                    style={styles.searchInput}
+                    value={newDistanceKcal}
+                    onChangeText={(t) => setNewDistanceKcal(t.replace(/[^0-9.]/g, ''))}
+                    keyboardType="decimal-pad"
+                    placeholder="如 60"
+                    placeholderTextColor={colors.textMuted}
+                  />
+                  <Text style={styles.hintText}>消耗 = 距离(km) × 每公里 kcal</Text>
+                </>
+              )}
+              {newKind === 'weight' && (
+                <>
+                  <Text style={styles.label}>每 1kg×1 次消耗 kcal</Text>
+                  <TextInput
+                    style={styles.searchInput}
+                    value={newWeightFactor}
+                    onChangeText={(t) => setNewWeightFactor(t.replace(/[^0-9.]/g, ''))}
+                    keyboardType="decimal-pad"
+                    placeholder="如 0.02"
+                    placeholderTextColor={colors.textMuted}
+                  />
+                  <Text style={styles.hintText}>记录时输入重量和次数，消耗 = 重量 × 次数 × 系数</Text>
+                </>
+              )}
+              {/* 本次成果（选填）：填了保存会自动记录到今日运动 */}
+              <Text style={styles.label}>本次成果（选填）</Text>
+              {newKind === 'duration' && (
+                <View style={styles.durationRow}>
+                  <TextInput
+                    style={styles.searchInput}
+                    value={newResultA}
+                    onChangeText={(t) => setNewResultA(t.replace(/[^0-9.]/g, ''))}
+                    keyboardType="numeric"
+                    placeholder="时长（分钟）如 30"
+                    placeholderTextColor={colors.textMuted}
+                  />
+                  <Text style={styles.durationUnit}>分</Text>
+                </View>
+              )}
+              {newKind === 'reps' && (
+                <TextInput
+                  style={styles.searchInput}
+                  value={newResultA}
+                  onChangeText={(t) => setNewResultA(t.replace(/[^0-9]/g, ''))}
+                  keyboardType="number-pad"
+                  placeholder="个数 如 20"
+                  placeholderTextColor={colors.textMuted}
+                />
+              )}
+              {newKind === 'distance' && (
+                <View style={styles.durationRow}>
+                  <TextInput
+                    style={styles.searchInput}
+                    value={newResultA}
+                    onChangeText={(t) => setNewResultA(t.replace(/[^0-9.]/g, ''))}
+                    keyboardType="numeric"
+                    placeholder="距离(km) 如 5"
+                    placeholderTextColor={colors.textMuted}
+                  />
+                  <Text style={styles.durationUnit}>km</Text>
+                </View>
+              )}
+              {newKind === 'weight' && (
+                <>
+                  <View style={styles.durationRow}>
+                    <TextInput
+                      style={styles.searchInput}
+                      value={newResultB}
+                      onChangeText={(t) => setNewResultB(t.replace(/[^0-9.]/g, ''))}
+                      keyboardType="numeric"
+                      placeholder="重量(kg) 如 50"
+                      placeholderTextColor={colors.textMuted}
+                    />
+                    <Text style={styles.durationUnit}>kg</Text>
+                  </View>
+                  <TextInput
+                    style={styles.searchInput}
+                    value={newResultA}
+                    onChangeText={(t) => setNewResultA(t.replace(/[^0-9]/g, ''))}
+                    keyboardType="number-pad"
+                    placeholder="个数 如 20"
+                    placeholderTextColor={colors.textMuted}
+                  />
+                </>
+              )}
+              <Text style={styles.hintText}>填了保存将自动记录到今日运动；不填则仅创建运动</Text>
               <Pressable style={styles.createBtn} onPress={handleCreate}>
                 <Text style={styles.createBtnText}>{creating ? '保存中…' : '保存'}</Text>
               </Pressable>
-            </>
+            </ScrollView>
           ) : (
             <>
               <View style={styles.pickerHeader}>
@@ -652,28 +894,71 @@ function SportPicker({
                 placeholderTextColor={colors.textMuted}
                 autoFocus
               />
-              <FlatList
-                data={options}
-                keyExtractor={(o) => (o.custom ? `c-${o.name}` : `b-${o.name}`)}
-                keyboardShouldPersistTaps="handled"
-                style={styles.pickerList}
-                ListEmptyComponent={
-                  <Text style={styles.emptyText}>没有匹配的运动，点下方"新增运动"创建</Text>
-                }
-                renderItem={({ item }) => (
-                  <Pressable style={styles.optionRow} onPress={() => onSelect(item)}>
-                    <SportIcon emoji={item.emoji} size={40} />
-                    <View style={styles.optionInfo}>
-                      <Text style={styles.optionName}>{item.name}</Text>
-                      <Text style={styles.optionMeta}>
-                        {item.custom ? '自定义' : '内置'} ·{' '}
-                        {item.kind === 'reps' ? '按次数' : item.kind === 'weight' ? '重量·次数' : `MET ${item.met}`}
-                      </Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-                  </Pressable>
-                )}
-              />
+              {keyword.trim() ? (
+                <FlatList
+                  data={options}
+                  keyExtractor={(o) => (o.custom ? `c-${o.name}` : `b-${o.name}`)}
+                  keyboardShouldPersistTaps="handled"
+                  style={styles.pickerList}
+                  ListEmptyComponent={
+                    <Text style={styles.emptyText}>没有匹配的运动，点下方"新增运动"创建</Text>
+                  }
+                  renderItem={({ item }) => (
+                    <Pressable style={styles.optionRow} onPress={() => onSelect(item)}>
+                      <SportIcon emoji={item.emoji} size={40} />
+                      <View style={styles.optionInfo}>
+                        <Text style={styles.optionName}>{item.name}</Text>
+                        <Text style={styles.optionMeta}>
+                          {item.typeName ?? ''} · {item.kind === 'reps' ? '按次数' : item.kind === 'weight' ? '重量·次数' : item.kind === 'distance' ? '距离' : '时长'}
+                        </Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                    </Pressable>
+                  )}
+                />
+              ) : (
+                <ScrollView
+                  style={styles.pickerList}
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                >
+                  {grouped.map(([gname, items]) => {
+                    const open = expanded.has(gname);
+                    return (
+                      <View key={gname}>
+                        <Pressable style={styles.groupHeader} onPress={() => toggleGroup(gname)}>
+                          <Text style={styles.groupTitle}>{gname}</Text>
+                          <View style={styles.groupRight}>
+                            <Text style={styles.groupCount}>{items.length}</Text>
+                            <Ionicons
+                              name={open ? 'chevron-up' : 'chevron-down'}
+                              size={16}
+                              color={colors.textSecondary}
+                            />
+                          </View>
+                        </Pressable>
+                        {open &&
+                          items.map((item) => (
+                            <Pressable
+                              key={item.id ?? item.name}
+                              style={styles.optionRow}
+                              onPress={() => onSelect(item)}
+                            >
+                              <SportIcon emoji={item.emoji} size={36} />
+                              <View style={styles.optionInfo}>
+                                <Text style={styles.optionName}>{item.name}</Text>
+                                <Text style={styles.optionMeta}>
+                                  {item.typeName ?? ''} · {item.kind === 'reps' ? '按次数' : item.kind === 'weight' ? '重量·次数' : item.kind === 'distance' ? '距离' : '时长'}
+                                </Text>
+                              </View>
+                              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                            </Pressable>
+                          ))}
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+              )}
               <Pressable style={styles.createEntry} onPress={() => setShowCreate(true)}>
                 <Ionicons name="add-circle-outline" size={20} color={colors.primary} />
                 <Text style={styles.createEntryText}>新增运动</Text>
@@ -783,6 +1068,15 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.md,
   },
+  kindGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  kindBtnHalf: {
+    flexBasis: '48%',
+    flexGrow: 1,
+  },
   quickBtn: {
     flex: 1,
     paddingVertical: spacing.sm,
@@ -856,8 +1150,10 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: radius.lg,
     borderTopRightRadius: radius.lg,
     padding: contentPadding,
-    paddingBottom: spacing.xxl,
-    maxHeight: '75%',
+    maxHeight: '80%',
+  },
+  createScroll: {
+    flexShrink: 1,
   },
   pickerHeader: {
     flexDirection: 'row',
@@ -884,6 +1180,30 @@ const styles = StyleSheet.create({
   },
   pickerList: {
     flexGrow: 0,
+  },
+  groupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  groupTitle: {
+    fontFamily: fontFamily.title,
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  groupRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  groupCount: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.xs,
+    color: colors.textMuted,
   },
   optionRow: {
     flexDirection: 'row',
