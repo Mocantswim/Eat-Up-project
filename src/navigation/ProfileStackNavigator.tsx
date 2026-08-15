@@ -5,6 +5,8 @@ import EditProfileScreen from '../screens/EditProfileScreen';
 import CustomSportsScreen from '../screens/CustomSportsScreen';
 import CustomSportFormScreen from '../screens/CustomSportFormScreen';
 import AchievementsScreen from '../screens/AchievementsScreen';
+import PlansScreen from '../screens/PlansScreen';
+import PlanFormScreen from '../screens/PlanFormScreen';
 import AboutScreen from '../screens/AboutScreen';
 import type { ProfileStackParamList } from './types';
 
@@ -18,6 +20,8 @@ export default function ProfileStackNavigator() {
       <Stack.Screen name="CustomSports" component={CustomSportsScreen} />
       <Stack.Screen name="CustomSportForm" component={CustomSportFormScreen} />
       <Stack.Screen name="Achievements" component={AchievementsScreen} />
+      <Stack.Screen name="Plans" component={PlansScreen} />
+      <Stack.Screen name="PlanForm" component={PlanFormScreen} />
       <Stack.Screen name="About" component={AboutScreen} />
     </Stack.Navigator>
   );

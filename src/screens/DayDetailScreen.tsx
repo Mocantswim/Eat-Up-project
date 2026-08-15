@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -8,6 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,7 +27,8 @@ import {
   type ExerciseLog,
 } from '../db/exerciseLogDao';
 import { getWeightByDate, upsertWeight } from '../db/weightRecordDao';
-import { updateCurrentWeight } from '../db/userProfileDao';
+import { getProfile, updateCurrentWeight, type UserProfile } from '../db/userProfileDao';
+import { applyPlanToDate, getAllPlans, type WorkoutPlan } from '../db/planDao';
 import { builtinEmojiByName } from '../constants/sports';
 import { dayTitle } from '../utils/date';
 import { shouldTriggerConfetti } from '../utils/confetti';
@@ -44,6 +47,9 @@ export default function DayDetailScreen({ navigation, route }: Props) {
   const [weightInput, setWeightInput] = useState('');
   const [confetti, setConfetti] = useState(false);
   const [expandedNoteId, setExpandedNoteId] = useState<number | null>(null);
+  const [planModalVisible, setPlanModalVisible] = useState(false);
+  const [plans, setPlans] = useState<WorkoutPlan[]>([]);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
 
   const load = useCallback(async () => {
     const [list, t, w, trigger] = await Promise.all([
@@ -56,13 +62,48 @@ export default function DayDetailScreen({ navigation, route }: Props) {
     setTotal(t);
     setWeightInput(w != null ? String(w) : '');
     if (trigger) setConfetti(true);
+    const p = await getProfile();
+    setProfile(p);
+  }, [date]);
+
+  /** 自动提示：当天星期匹配的计划（每计划每日期提示一次） */
+  const checkPlanPrompt = useCallback(async () => {
+    const wd = new Date(date).getDay();
+    const dayNum = wd === 0 ? 7 : wd;
+    const all = await getAllPlans();
+    const matched = all.filter((x) => x.days && x.days.includes(dayNum));
+    const p = await getProfile();
+    if (matched.length === 0 || !p?.weight) return;
+    const key = `plan_prompt_${date}`;
+    if (await AsyncStorage.getItem(key)) return;
+    await AsyncStorage.setItem(key, '1');
+    Alert.alert('今日训练计划', `「${matched[0].name}」匹配今日，是否一键添加？`, [
+      { text: '稍后', style: 'cancel' },
+      { text: '一键添加', onPress: () => applyPlan(matched[0].id) },
+    ]);
   }, [date]);
 
   useFocusEffect(
     useCallback(() => {
       load();
-    }, [load])
+      checkPlanPrompt();
+    }, [load, checkPlanPrompt])
   );
+
+  /** 一键添加计划 → 生成当天普通记录 */
+  const applyPlan = async (planId: number) => {
+    const p = await getProfile();
+    if (!p?.weight) { Alert.alert('提示', '请先在“我的”设置体重'); return; }
+    const n = await applyPlanToDate(planId, date, p.weight);
+    setPlanModalVisible(false);
+    Alert.alert('完成', `已添加 ${n} 条运动记录`);
+    load();
+  };
+
+  const openPlanPicker = async () => {
+    setPlans(await getAllPlans());
+    setPlanModalVisible(true);
+  };
 
   const handleWeightSave = async () => {
     if (!weightInput.trim()) return; // 留空不写入/不删除（§6.6）
@@ -136,7 +177,12 @@ export default function DayDetailScreen({ navigation, route }: Props) {
         <WorkoutTimer onFinish={handleTimerFinish} />
 
         {/* 运动列表 */}
-        <Text style={styles.sectionTitle}>运动记录</Text>
+        <View style={styles.sectionRow}>
+          <Text style={styles.sectionTitle}>运动记录</Text>
+          <Pressable hitSlop={8} onPress={openPlanPicker}>
+            <Text style={styles.planBtn}>📋 按计划添加</Text>
+          </Pressable>
+        </View>
         {logs.length === 0 ? (
           <EmptyState emoji="🏃" text="这一天还没有运动记录，点击右下角 + 添加" />
         ) : (
@@ -203,6 +249,28 @@ export default function DayDetailScreen({ navigation, route }: Props) {
 
       <FAB onPress={() => navigation.navigate('AddEditExercise', { date })} />
       <Confetti visible={confetti} onFinish={() => setConfetti(false)} />
+
+      {/* 按计划添加弹窗 */}
+      <Modal visible={planModalVisible} transparent animationType="slide">
+        <View style={styles.planOverlay}>
+          <View style={styles.planSheet}>
+            <Text style={styles.planTitle}>选择计划</Text>
+            {plans.length === 0 ? (
+              <Text style={styles.planEmpty}>还没有计划，去 我的→训练计划 创建</Text>
+            ) : (
+              plans.map((p) => (
+                <Pressable key={p.id} style={styles.planItem} onPress={() => applyPlan(p.id)}>
+                  <Text style={styles.planName}>{p.name}</Text>
+                  <Text style={styles.planMeta}>{p.days ? `周${p.days.map((d) => '一二三四五六日'[d - 1]).join('/')}` : '通用模板'}</Text>
+                </Pressable>
+              ))
+            )}
+            <Pressable style={styles.planCancel} onPress={() => setPlanModalVisible(false)}>
+              <Text style={styles.planCancelText}>取消</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -275,6 +343,18 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: spacing.md,
   },
+  sectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  planBtn: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.primary,
+    fontWeight: '600',
+    marginBottom: spacing.md,
+  },
   logCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -305,6 +385,15 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: colors.textSecondary,
   },
+  planOverlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
+  planSheet: { backgroundColor: colors.card, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: contentPadding, paddingBottom: spacing.xxl },
+  planTitle: { fontFamily: fontFamily.title, fontSize: fontSize.lg, fontWeight: '700', color: colors.text, marginBottom: spacing.md },
+  planEmpty: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textMuted, textAlign: 'center', paddingVertical: spacing.xl },
+  planItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
+  planName: { fontFamily: fontFamily.body, fontSize: fontSize.md, color: colors.text, fontWeight: '600' },
+  planMeta: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textMuted },
+  planCancel: { marginTop: spacing.md, alignItems: 'center', paddingVertical: spacing.sm },
+  planCancelText: { fontFamily: fontFamily.body, fontSize: fontSize.md, color: colors.textSecondary },
   logInfo: {
     flex: 1,
     marginLeft: spacing.md,

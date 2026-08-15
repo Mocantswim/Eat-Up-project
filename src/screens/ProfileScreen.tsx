@@ -83,6 +83,11 @@ export default function ProfileScreen({ navigation }: Props) {
           onPress={() => navigation.navigate('Achievements')}
         />
         <MenuItem
+          icon="clipboard-outline"
+          label="训练计划"
+          onPress={() => navigation.navigate('Plans')}
+        />
+        <MenuItem
           icon="fitness-outline"
           label="自定义运动管理"
           onPress={() => navigation.navigate('CustomSports')}

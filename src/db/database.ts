@@ -51,6 +51,31 @@ export async function initDatabase(): Promise<void> {
       name       TEXT NOT NULL UNIQUE,
       met_value  REAL NOT NULL
     );
+
+    -- 训练计划（批量添加快捷方式，非独立模块）
+    CREATE TABLE IF NOT EXISTS workout_plans (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      name        TEXT NOT NULL,
+      days        TEXT,              -- 绑定星期 '1,3,5'（1=周一）；NULL=通用模板
+      created_at  TEXT NOT NULL,
+      updated_at  TEXT NOT NULL
+    );
+
+    -- 计划动作
+    CREATE TABLE IF NOT EXISTS workout_plan_items (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      plan_id     INTEGER NOT NULL,
+      sport_name  TEXT NOT NULL,     -- 动作名
+      kind        TEXT NOT NULL,     -- duration/reps/weight/distance
+      met         REAL NOT NULL,     -- 系数快照（预估热量）
+      factor      REAL,              -- rep/weight/distance 系数
+      sets        INTEGER NOT NULL DEFAULT 1, -- 组数
+      target      REAL NOT NULL,     -- 单组目标：次数/分钟/距离km
+      load_kg     REAL,              -- 重量型
+      est_minutes REAL,              -- 预计时长（分钟）
+      sort_order  INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_plan_items_plan ON workout_plan_items (plan_id);
   `);
 
   await migrateUserProfileGoals(database);

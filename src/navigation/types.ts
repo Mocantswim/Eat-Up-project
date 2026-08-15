@@ -22,6 +22,8 @@ export type ProfileStackParamList = {
   CustomSports: undefined;
   CustomSportForm: { sportId?: number };
   Achievements: undefined;
+  Plans: undefined;
+  PlanForm: { planId?: number };
   About: undefined;
 };
 

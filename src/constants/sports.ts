@@ -78,13 +78,16 @@ export interface SportItem {
   searchKey: string;
 }
 
-/** 从类型表展开为扁平化动作列表 */
+/** 从类型表展开为扁平化动作列表（按动作名去重，避免跨类型重复） */
 export function buildSportItems(types: ExerciseTypeDef[]): SportItem[] {
   const items: SportItem[] = [];
+  const seen = new Set<string>();
   for (const t of types) {
     const group = MUSCLE_GROUPS.find((g) => g.id === t.groupId);
     const gname = group?.name ?? '其他';
     for (const v of t.variants) {
+      if (seen.has(v.name)) continue; // 同名动作只保留一次
+      seen.add(v.name);
       items.push({
         id: `${t.groupId}-${v.name}`,
         name: v.name,
