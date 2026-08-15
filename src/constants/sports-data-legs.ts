@@ -20,7 +20,10 @@ export const LEGS_TYPES: ExerciseTypeDef[] = [
   { typeName: '腿弯举', emoji: '🦵', groupId: 'legs', kind: 'weight', modes: ['reps', 'weight'], met: 3.0, weightFactor: 0.02, aliases: '腿弯举 腘绳',
     variants: [{ name: '俯卧腿弯举' }, { name: '坐姿腿弯举' }, { name: '单腿腿弯举' }, { name: '北欧腿弯举', kind: 'reps', modes: ['reps'] }] },
   { typeName: '臀桥', emoji: '🍑', groupId: 'glutes', kind: 'reps', modes: ['reps', 'weight'], met: 3.5, repFactor: 0.015, weightFactor: 0.02, addBodyWeight: true, aliases: '臀桥 臀推',
-    variants: [{ name: '标准臀桥' }, { name: '单腿臀桥' }, { name: '杠铃臀桥' }, { name: '杠铃臀推' }] },
+    variants: [
+      { name: '标准臀桥' }, { name: '单腿臀桥' }, { name: '杠铃臀桥' }, { name: '杠铃臀推' },
+      { name: '哑铃臀桥' }, { name: '哑铃臀推' }, { name: '弹力带臀桥' }, { name: '高处臀桥' },
+    ] },
   { typeName: '髋外展', emoji: '🍑', groupId: 'glutes', kind: 'reps', modes: ['reps', 'weight'], met: 3.0, repFactor: 0.015, weightFactor: 0.02, addBodyWeight: true, aliases: '髋外展 抬腿',
     variants: [{ name: '器械髋外展' }, { name: '弹力带髋外展' }, { name: '侧卧抬腿' }] },
   { typeName: '后踢腿', emoji: '🦵', groupId: 'glutes', kind: 'reps', modes: ['reps'], met: 3.0, repFactor: 0.015, aliases: '后踢 驴踢',

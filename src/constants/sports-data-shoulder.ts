@@ -8,7 +8,10 @@ export const SHOULDER_TYPES: ExerciseTypeDef[] = [
       { name: '借力推举' }, { name: '半程推举' }, { name: '交替哑铃推举' }, { name: '史密斯机推肩' },
     ] },
   { typeName: '侧平举', emoji: '🤸', groupId: 'shoulder', kind: 'weight', modes: ['reps', 'weight'], met: 3.0, weightFactor: 0.015, aliases: '侧平举 侧举',
-    variants: [{ name: '哑铃侧平举' }, { name: '绳索侧平举' }, { name: '器械侧平举' }, { name: '单臂侧平举' }, { name: '上斜侧平举' }] },
+    variants: [
+      { name: '哑铃侧平举' }, { name: '绳索侧平举' }, { name: '器械侧平举' }, { name: '单臂侧平举' },
+      { name: '上斜侧平举' }, { name: '肘部微屈侧平举' }, { name: '侧卧侧平举' }, { name: '弹力带侧平举' },
+    ] },
   { typeName: '前平举', emoji: '🤚', groupId: 'shoulder', kind: 'weight', modes: ['reps', 'weight'], met: 3.0, weightFactor: 0.015, aliases: '前平举 前举',
     variants: [{ name: '哑铃前平举' }, { name: '杠铃前平举' }, { name: '绳索前平举' }, { name: '单臂前平举' }] },
   { typeName: '后束', emoji: '🙆', groupId: 'shoulder', kind: 'weight', modes: ['reps', 'weight'], met: 3.0, weightFactor: 0.015, aliases: '后束 面拉 反向飞鸟',

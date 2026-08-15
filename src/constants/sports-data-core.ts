@@ -10,7 +10,11 @@ export const CORE_TYPES: ExerciseTypeDef[] = [
   { typeName: '举腿', emoji: '🦵', groupId: 'core', kind: 'reps', modes: ['reps'], met: 3.5, repFactor: 0.02, aliases: '举腿 抬腿',
     variants: [{ name: '悬垂举腿' }, { name: '仰卧抬腿' }, { name: '罗马椅举腿' }, { name: '平板支撑举腿' }] },
   { typeName: '平板支撑', emoji: '🧎', groupId: 'core', kind: 'duration', modes: ['duration'], met: 3.0, aliases: '平板 支撑',
-    variants: [{ name: '标准平板支撑' }, { name: '侧平板支撑' }, { name: '动态平板支撑' }, { name: '平板支撑转体' }, { name: '平板支撑开合跳' }] },
+    variants: [
+      { name: '标准平板支撑' }, { name: '侧平板支撑' }, { name: '动态平板支撑' }, { name: '平板支撑转体' },
+      { name: '平板支撑开合跳' }, { name: '平板支撑交替抬手' }, { name: '平板支撑划船' },
+      { name: '高平板支撑' }, { name: '低平板支撑' }, { name: '侧平板支撑抬腿' },
+    ] },
   { typeName: '俄罗斯转体', emoji: '🔄', groupId: 'core', kind: 'reps', modes: ['reps', 'weight'], met: 3.5, repFactor: 0.02, weightFactor: 0.02, aliases: '俄转 转体',
     variants: [{ name: '徒手俄罗斯转体' }, { name: '负重俄罗斯转体' }, { name: '药球俄罗斯转体' }] },
   { typeName: '腹斜肌', emoji: '🌀', groupId: 'core', kind: 'reps', modes: ['reps', 'weight'], met: 3.5, repFactor: 0.02, weightFactor: 0.02, aliases: '腹斜 伐木 侧屈',

@@ -8,7 +8,11 @@ export const BACK_TYPES: ExerciseTypeDef[] = [
       { name: '单臂引体向上', repFactor: 0.06 }, { name: '负重引体向上' }, { name: '弹力带引体向上' }, { name: '毛巾引体向上' },
     ] },
   { typeName: '划船', emoji: '🚣', groupId: 'back', kind: 'weight', modes: ['reps', 'weight'], met: 4.0, weightFactor: 0.02, aliases: '划船 俯身划船',
-    variants: [{ name: '杠铃俯身划船' }, { name: '哑铃单臂划船' }, { name: '坐姿绳索划船' }, { name: '器械划船' }, { name: '胸部支撑划船' }] },
+    variants: [
+      { name: '杠铃俯身划船' }, { name: '哑铃单臂划船' }, { name: '坐姿绳索划船' }, { name: '器械划船' },
+      { name: '胸部支撑划船' }, { name: '潘德勒划船' }, { name: '海豹划船' }, { name: 'T杠划船' },
+      { name: '单臂绳索划船' }, { name: '弹力带划船' }, { name: '哑铃双臂划船' },
+    ] },
   { typeName: '高位下拉', emoji: '⬇️', groupId: 'back', kind: 'weight', modes: ['reps', 'weight'], met: 4.5, weightFactor: 0.02, aliases: '下拉 高位下拉',
     variants: [{ name: '正手高位下拉' }, { name: '反手高位下拉' }, { name: '宽距高位下拉' }, { name: '窄距高位下拉' }, { name: '对握高位下拉' }, { name: '直臂下拉' }] },
   { typeName: '硬拉', emoji: '🏋️', groupId: 'back', kind: 'weight', modes: ['reps', 'weight'], met: 6.0, weightFactor: 0.02, aliases: '硬拉 拉',
