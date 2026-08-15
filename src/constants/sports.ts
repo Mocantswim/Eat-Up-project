@@ -171,7 +171,10 @@ const EXERCISE_TYPES: ExerciseTypeDef[] = [
   { typeName: '舞蹈', emoji: '🕺', groupId: 'cardio', kind: 'duration', modes: ['duration'], met: 4.5, aliases: '舞',
     variants: [{ name: '尊巴' }, { name: '街舞' }, { name: '拉丁舞' }, { name: '爵士舞' }] },
   { typeName: '球类', emoji: '🏀', groupId: 'cardio', kind: 'duration', modes: ['duration'], met: 6.0, aliases: '篮球 足球 羽毛球 网球 乒乓球 球',
-    variants: [{ name: '篮球' }, { name: '足球' }, { name: '羽毛球' }, { name: '网球' }, { name: '乒乓球' }] },
+    variants: [
+      { name: '篮球' }, { name: '足球' }, { name: '羽毛球' }, { name: '网球' }, { name: '乒乓球' },
+      { name: '壁球' }, { name: '手球' }, { name: '曲棍球' }, { name: '高尔夫' }, { name: '排球' }, { name: '橄榄球' },
+    ] },
   { typeName: '户外', emoji: '🥾', groupId: 'cardio', kind: 'duration', modes: ['duration', 'distance'], met: 5.5, distanceFactor: 0.5, aliases: '徒步 登山 滑雪 溜冰',
     variants: [{ name: '徒步' }, { name: '登山' }, { name: '越野滑雪' }, { name: '溜冰' }] },
 
@@ -188,7 +191,9 @@ const EXERCISE_TYPES: ExerciseTypeDef[] = [
     variants: [
       { name: '杠铃平板卧推' }, { name: '杠铃上斜卧推' }, { name: '杠铃下斜卧推' },
       { name: '哑铃平板卧推' }, { name: '哑铃上斜卧推' }, { name: '哑铃下斜卧推' },
-      { name: '器械推胸' }, { name: '史密斯机平板卧推' },
+      { name: '器械推胸' }, { name: '史密斯机平板卧推' }, { name: '史密斯机下斜卧推' },
+      { name: '哑铃交替卧推' }, { name: '哑铃地板卧推' }, { name: '弹力带卧推' },
+      { name: '蝴蝶机夹胸' }, { name: '绳索十字夹胸' }, { name: '龙门架夹胸' },
     ] },
   { typeName: '飞鸟', emoji: '🦋', groupId: 'chest', kind: 'weight', modes: ['reps', 'weight'], met: 3.2, weightFactor: 0.02, aliases: '飞鸟 夹胸 夹胸',
     variants: [
