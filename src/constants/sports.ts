@@ -55,6 +55,7 @@ export interface ExerciseTypeDef {
   addBodyWeight?: boolean;
   distanceFactor?: number;
   aliases?: string; // 搜索别名
+  note?: string;
   variants: VariantDef[];
 }
 
@@ -118,6 +119,11 @@ const EXERCISE_TYPES: ExerciseTypeDef[] = [
       { name: '变速跑', met: 8.0, distanceFactor: 1.0 },
       { name: '坡度跑', met: 9.0, distanceFactor: 1.1 },
       { name: '越野跑', met: 9.0, distanceFactor: 1.1 },
+      { name: '原地跑', met: 7.0, distanceFactor: 0.9 },
+      { name: '倒跑', met: 7.0, distanceFactor: 0.9 },
+      { name: '侧向跑', met: 7.0, distanceFactor: 0.9 },
+      { name: '赤足跑', met: 7.0, distanceFactor: 0.9 },
+      { name: '沙滩跑', met: 8.0, distanceFactor: 1.0 },
     ] },
   { typeName: '快走', emoji: '🚶', groupId: 'cardio', kind: 'duration', modes: ['duration', 'distance'], met: 5.0, distanceFactor: 0.5, aliases: '走路 步行',
     variants: [{ name: '快走', met: 5.0, distanceFactor: 0.5 }] },
@@ -164,6 +170,9 @@ const EXERCISE_TYPES: ExerciseTypeDef[] = [
     variants: [
       { name: '标准俯卧撑' }, { name: '宽距俯卧撑' }, { name: '窄距俯卧撑' }, { name: '钻石俯卧撑', repFactor: 0.05 },
       { name: '上斜俯卧撑' }, { name: '下斜俯卧撑' }, { name: '击掌俯卧撑', repFactor: 0.05 }, { name: '跪姿俯卧撑' },
+      { name: '打字机俯卧撑', repFactor: 0.05 }, { name: '蜥蜴俯卧撑', repFactor: 0.05 }, { name: '爆炸俯卧撑', repFactor: 0.06 },
+      { name: '药球俯卧撑', repFactor: 0.05 }, { name: '单臂俯卧撑', repFactor: 0.07 }, { name: '派克俯卧撑', repFactor: 0.05 },
+      { name: '倒立俯卧撑', repFactor: 0.07 }, { name: '俯卧撑划船', repFactor: 0.05 },
     ] },
   { typeName: '卧推', emoji: '🏋️', groupId: 'chest', kind: 'weight', modes: ['reps', 'weight'], met: 3.8, weightFactor: 0.02, aliases: '卧推 推胸',
     variants: [
@@ -203,11 +212,11 @@ export function getSportKindByName(name: string): SportKind {
   return BUILTIN_SPORTS.find((s) => s.name === name)?.kind ?? 'duration';
 }
 
-/** 按名称返回次数型/重量型系数 */
+/** 按名称返回次数型/重量型系数（不依赖默认 kind，变体 modes 含则可用） */
 export function getSportFactor(name: string): number {
   const s = BUILTIN_SPORTS.find((x) => x.name === name);
-  if (s?.kind === 'reps') return s.repFactor ?? 0;
-  if (s?.kind === 'weight') return s.weightFactor ?? 0;
+  if (s?.repFactor) return s.repFactor;
+  if (s?.weightFactor) return s.weightFactor;
   return 0;
 }
 

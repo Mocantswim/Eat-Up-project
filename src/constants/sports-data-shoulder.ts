@@ -2,7 +2,11 @@ import type { ExerciseTypeDef } from './sports';
 
 export const SHOULDER_TYPES: ExerciseTypeDef[] = [
   { typeName: '推举', emoji: '🏋️', groupId: 'shoulder', kind: 'weight', modes: ['reps', 'weight'], met: 4.5, weightFactor: 0.02, aliases: '推举 肩推 推肩',
-    variants: [{ name: '杠铃站姿推举' }, { name: '杠铃坐姿推举' }, { name: '哑铃坐姿推举' }, { name: '哑铃站姿推举' }, { name: '阿诺德推举' }, { name: '器械推肩' }, { name: '壶铃推举' }] },
+    variants: [
+      { name: '杠铃站姿推举' }, { name: '杠铃坐姿推举' }, { name: '哑铃坐姿推举' }, { name: '哑铃站姿推举' },
+      { name: '阿诺德推举' }, { name: '器械推肩' }, { name: '壶铃推举' }, { name: '单臂哑铃推举' },
+      { name: '借力推举' }, { name: '半程推举' }, { name: '交替哑铃推举' }, { name: '史密斯机推肩' },
+    ] },
   { typeName: '侧平举', emoji: '🤸', groupId: 'shoulder', kind: 'weight', modes: ['reps', 'weight'], met: 3.0, weightFactor: 0.015, aliases: '侧平举 侧举',
     variants: [{ name: '哑铃侧平举' }, { name: '绳索侧平举' }, { name: '器械侧平举' }, { name: '单臂侧平举' }, { name: '上斜侧平举' }] },
   { typeName: '前平举', emoji: '🤚', groupId: 'shoulder', kind: 'weight', modes: ['reps', 'weight'], met: 3.0, weightFactor: 0.015, aliases: '前平举 前举',

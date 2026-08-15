@@ -14,5 +14,11 @@ export const COMPOUND_TYPES: ExerciseTypeDef[] = [
       { name: '熊爬', kind: 'duration', modes: ['duration'] },
       { name: '药球砸地', kind: 'weight', modes: ['reps', 'weight'] },
       { name: '战绳', kind: 'duration', modes: ['duration'] },
+      { name: '壶铃挺举', kind: 'weight', modes: ['reps', 'weight'] },
+      { name: '壶铃高翻', kind: 'weight', modes: ['reps', 'weight'] },
+      { name: '深蹲推举', kind: 'weight', modes: ['reps', 'weight'] },
+      { name: '登山跑' },
+      { name: '波比跳加引体', repFactor: 0.06 },
+      { name: '药球旋转抛砸', kind: 'weight', modes: ['reps', 'weight'] },
     ] },
 ];

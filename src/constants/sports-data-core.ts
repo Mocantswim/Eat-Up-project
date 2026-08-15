@@ -2,7 +2,11 @@ import type { ExerciseTypeDef } from './sports';
 
 export const CORE_TYPES: ExerciseTypeDef[] = [
   { typeName: '卷腹', emoji: '🧘', groupId: 'core', kind: 'reps', modes: ['reps', 'weight'], met: 3.8, repFactor: 0.02, weightFactor: 0.02, aliases: '卷腹 卷',
-    variants: [{ name: '标准卷腹' }, { name: '反向卷腹' }, { name: '自行车卷腹' }, { name: '侧卷腹' }, { name: '健身球卷腹' }, { name: '绳索卷腹' }] },
+    variants: [
+      { name: '标准卷腹' }, { name: '反向卷腹' }, { name: '自行车卷腹' }, { name: '侧卷腹' },
+      { name: '健身球卷腹' }, { name: '绳索卷腹' }, { name: '下斜卷腹' }, { name: '跪姿卷腹' },
+      { name: '屈膝卷腹' }, { name: '抬腿卷腹' }, { name: '交替卷腹' }, { name: '负重卷腹' },
+    ] },
   { typeName: '举腿', emoji: '🦵', groupId: 'core', kind: 'reps', modes: ['reps'], met: 3.5, repFactor: 0.02, aliases: '举腿 抬腿',
     variants: [{ name: '悬垂举腿' }, { name: '仰卧抬腿' }, { name: '罗马椅举腿' }, { name: '平板支撑举腿' }] },
   { typeName: '平板支撑', emoji: '🧎', groupId: 'core', kind: 'duration', modes: ['duration'], met: 3.0, aliases: '平板 支撑',

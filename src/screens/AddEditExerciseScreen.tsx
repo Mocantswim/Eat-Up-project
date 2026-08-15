@@ -27,6 +27,7 @@ import { colors, contentPadding, fontFamily, fontSize, radius, spacing } from '.
 type Props = NativeStackScreenProps<HomeStackParamList, 'AddEditExercise'>;
 
 interface SportOption {
+  id?: string;
   name: string;
   met: number;
   emoji: string;
@@ -83,7 +84,7 @@ export default function AddEditExerciseScreen({ navigation, route }: Props) {
         custom: false,
         kind: s.kind,
         modes: s.modes,
-        factor: s.kind === 'reps' ? s.repFactor : s.kind === 'weight' ? s.weightFactor : undefined,
+        factor: s.repFactor ?? s.weightFactor ?? undefined,
         addBodyWeight: s.addBodyWeight,
         distanceFactor: s.distanceFactor,
         groupId: s.groupId,

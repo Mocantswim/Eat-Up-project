@@ -2,9 +2,17 @@ import type { ExerciseTypeDef } from './sports';
 
 export const LEGS_TYPES: ExerciseTypeDef[] = [
   { typeName: '深蹲', emoji: '🦵', groupId: 'legs', kind: 'reps', modes: ['reps', 'weight'], met: 5.0, repFactor: 0.02, weightFactor: 0.02, addBodyWeight: true, aliases: '深蹲 蹲',
-    variants: [{ name: '徒手深蹲' }, { name: '杠铃深蹲' }, { name: '哑铃深蹲' }, { name: '高脚杯深蹲' }, { name: '前蹲' }, { name: '保加利亚分腿蹲' }, { name: '相扑深蹲' }, { name: '箱式深蹲' }] },
-  { typeName: '箭步蹲', emoji: '🚶', groupId: 'legs', kind: 'reps', modes: ['reps', 'weight'], met: 4.5, repFactor: 0.02, weightFactor: 0.02, addBodyWeight: true, aliases: '箭步蹲 弓步',
-    variants: [{ name: '原地箭步蹲' }, { name: '行走箭步蹲' }, { name: '反向箭步蹲' }, { name: '侧向箭步蹲' }, { name: '登阶' }] },
+    variants: [
+      { name: '徒手深蹲' }, { name: '杠铃深蹲' }, { name: '哑铃深蹲' }, { name: '高脚杯深蹲' },
+      { name: '前蹲' }, { name: '保加利亚分腿蹲' }, { name: '相扑深蹲' }, { name: '箱式深蹲' },
+      { name: '宽距深蹲' }, { name: '窄距深蹲' }, { name: '单腿深蹲', repFactor: 0.04 }, { name: '跳跃深蹲', repFactor: 0.03 },
+      { name: '深蹲跳', repFactor: 0.03 }, { name: '墙蹲', kind: 'duration', modes: ['duration'] },
+    ] },
+  { typeName: '箭步蹲', emoji: '🚶', groupId: 'legs', kind: 'reps', modes: ['reps', 'weight'], met: 4.5, repFactor: 0.02, weightFactor: 0.02, addBodyWeight: true, aliases: '箭步蹲 弓步 前弓步',
+    variants: [
+      { name: '原地箭步蹲' }, { name: '前弓步' }, { name: '行走箭步蹲' }, { name: '反向箭步蹲' },
+      { name: '侧向箭步蹲' }, { name: '对角箭步蹲' }, { name: '跳跃箭步蹲' }, { name: '登阶' },
+    ] },
   { typeName: '腿举', emoji: '🦿', groupId: 'legs', kind: 'weight', modes: ['reps', 'weight'], met: 4.5, weightFactor: 0.02, aliases: '腿举',
     variants: [{ name: '器械腿举' }, { name: '单腿腿举' }] },
   { typeName: '腿屈伸', emoji: '🦵', groupId: 'legs', kind: 'weight', modes: ['reps', 'weight'], met: 3.0, weightFactor: 0.02, aliases: '腿屈伸 股四头',
